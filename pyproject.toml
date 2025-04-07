@@ -35,13 +35,6 @@ Issues = "https://github.com/crowecawcaw/click-mcp/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["click_mcp"]
 
-[tool.hatch.build.hooks.check]
-dependencies = ["black", "ruff", "mypy", "pytest", "pytest-cov"]
-test = "pytest --cov=click_mcp tests/"
-style = "black --check click_mcp tests"
-lint = "ruff check click_mcp tests"
-typecheck = "mypy click_mcp"
-
 [tool.hatch.version]
 path = "click_mcp/_version.py"
 
