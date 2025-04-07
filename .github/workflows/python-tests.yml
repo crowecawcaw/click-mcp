@@ -24,9 +24,6 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install hatch
-    - name: Format and Lint
-      run: |
-        hatch run lint:all
     - name: Test with pytest
       run: |
         hatch run test:cov

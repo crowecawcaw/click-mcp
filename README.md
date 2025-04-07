@@ -167,45 +167,12 @@ hatch run test:run
 hatch run test:cov
 ```
 
-### Code Quality
-
-Code quality checks are automatically run as part of the CI pipeline:
-
-- **Black**: Code formatting is checked and applied
-- **Pylint**: Linting checks are run to ensure code quality
-- **Pytest**: Tests are run to verify functionality
-
-You can also run these checks manually:
-
-```bash
-# Format code with black
-hatch run lint:format
-
-# Check formatting without changing files
-hatch run lint:style
-
-# Run linting checks
-hatch run lint:check
-
-# Run all code quality checks
-hatch run lint:all
-```
-
 ### Building
 
 Build the package:
 
 ```bash
 hatch build
-```
-
-### Documentation
-
-Generate documentation:
-
-```bash
-cd docs
-make html
 ```
 
 ## Related Resources
