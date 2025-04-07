@@ -155,6 +155,14 @@ cd click-mcp
 pip install -e ".[dev]"
 ```
 
+Or with UV (faster installation):
+
+```bash
+git clone https://github.com/aws/click-mcp.git
+cd click-mcp
+uv pip install -e ".[dev]"
+```
+
 ### Testing
 
 Run tests with pytest:
@@ -188,6 +196,13 @@ flake8 click_mcp tests
 Build the package:
 
 ```bash
+python -m build
+```
+
+Or with UV:
+
+```bash
+uv pip install build
 python -m build
 ```
 
