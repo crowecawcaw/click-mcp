@@ -21,20 +21,3 @@ typecheck = "mypy click_mcp"
 check-all = ["check-format", "lint", "typecheck", "cov"]
 build = "python -m build"
 docs = "cd docs && make html"
-
-[env.ci]
-dependencies = [
-  "pytest>=7.0.0",
-  "pytest-cov>=4.0.0",
-  "black>=23.0.0",
-  "ruff>=0.1.0",
-  "mypy>=1.5.0",
-]
-
-[env.ci.scripts]
-test = "pytest tests/"
-cov = "pytest --cov=click_mcp --cov-report=term-missing tests/"
-lint = "ruff check click_mcp tests"
-check-format = "black --check click_mcp tests"
-typecheck = "mypy click_mcp"
-check-all = ["check-format", "lint", "typecheck", "cov"]

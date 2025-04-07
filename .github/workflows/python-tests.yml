@@ -26,4 +26,4 @@ jobs:
         pip install hatch
     - name: Run checks
       run: |
-        hatch -e ci run check-all
+        hatch run check-all
