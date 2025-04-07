@@ -161,10 +161,46 @@ Run tests with Hatch:
 
 ```bash
 # Run all tests
-hatch run test:run
+hatch run test
 
 # Run tests with coverage
-hatch run test:cov
+hatch run cov
+```
+
+### Code Formatting
+
+Format code with Black:
+
+```bash
+# Format code
+hatch run format
+
+# Check formatting
+hatch run check-format
+```
+
+### Linting
+
+Run linting checks with Ruff:
+
+```bash
+hatch run lint
+```
+
+### Type Checking
+
+Run type checking with MyPy:
+
+```bash
+hatch run typecheck
+```
+
+### Run All Checks
+
+Run all checks (formatting, linting, type checking, and tests):
+
+```bash
+hatch run check-all
 ```
 
 ### Building
@@ -172,7 +208,15 @@ hatch run test:cov
 Build the package:
 
 ```bash
-hatch build
+hatch run build
+```
+
+### Documentation
+
+Generate documentation:
+
+```bash
+hatch run docs
 ```
 
 ## Related Resources
