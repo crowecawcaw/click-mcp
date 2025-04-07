@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "click-mcp"
+version = "0.1.0"
+description = "Extend Click applications with Model Context Protocol (MCP) support"
+readme = "README.md"
+authors = [
+    {name = "Stephen Crowe"}
+]
+requires-python = ">=3.8"
+license = {text = "MIT"}
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "click>=7.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/crowecawcaw/click-mcp"
+Issues = "https://github.com/crowecawcaw/click-mcp/issues"
+
+[tool.black]
+target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
