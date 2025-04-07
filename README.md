@@ -1,5 +1,8 @@
 # click-mcp
 
+[![PyPI version](https://badge.fury.io/py/click-mcp.svg)](https://badge.fury.io/py/click-mcp)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 A Python library that extends Click applications with Model Context Protocol (MCP) support, allowing AI agents to interact with CLI tools.
 
 ## Overview
