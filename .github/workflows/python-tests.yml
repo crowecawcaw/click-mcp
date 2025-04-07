@@ -16,6 +16,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
@@ -26,4 +28,4 @@ jobs:
         pip install hatch
     - name: Run tests
       run: |
-        hatch run cov
+        hatch run test
