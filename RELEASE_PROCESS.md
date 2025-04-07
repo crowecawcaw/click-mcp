@@ -19,7 +19,18 @@ git add pyproject.toml
 git commit -m "Bump version to X.Y.Z"
 ```
 
-## 2. Create a GitHub Release
+## 2. Run Quality Checks
+
+1. Ensure all tests pass and code quality checks succeed:
+
+```bash
+hatch run lint:all
+hatch run test:cov
+```
+
+2. Fix any issues that arise from these checks.
+
+## 3. Create a GitHub Release
 
 1. Push your changes to GitHub:
 
@@ -40,14 +51,14 @@ git push origin main
 
 6. Click "Publish release"
 
-## 3. Automatic PyPI Publishing
+## 4. Automatic PyPI Publishing
 
 The GitHub Actions workflow will automatically:
 1. Build the package
 2. Upload it to PyPI
 3. Make it available for installation via `pip install click-mcp`
 
-## 4. Verify the Release
+## 5. Verify the Release
 
 After the GitHub Actions workflow completes:
 

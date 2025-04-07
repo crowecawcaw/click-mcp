@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=42", "wheel"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
 [project]
 name = "click-mcp"
@@ -28,21 +28,49 @@ dependencies = [
     "click>=7.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-cov>=4.0.0",
-    "black>=23.0.0",
-    "pylint>=2.15.0",
-    "build>=0.10.0",
-]
-
 [project.urls]
 Homepage = "https://github.com/crowecawcaw/click-mcp"
 Issues = "https://github.com/crowecawcaw/click-mcp/issues"
 
+[tool.hatch.build.targets.wheel]
+packages = ["click_mcp"]
+
+[tool.hatch.envs.default]
+dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "pylint>=2.15.0",
+]
+
+[tool.hatch.envs.test]
+dependencies = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[tool.hatch.envs.lint]
+dependencies = [
+    "black>=23.0.0",
+    "pylint>=2.15.0",
+]
+
+[tool.hatch.envs.test.scripts]
+run = "pytest {args:tests}"
+cov = "pytest --cov=click_mcp --cov-report=term-missing {args:tests}"
+
+[tool.hatch.envs.lint.scripts]
+style = "black --check click_mcp tests"
+format = "black click_mcp tests"
+check = "pylint click_mcp tests"
+all = ["format", "check"]
+
 [tool.black]
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+line-length = 88
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+python_files = "test_*.py"
+python_functions = "test_*"
+addopts = "--cov=click_mcp --cov-report=term-missing"

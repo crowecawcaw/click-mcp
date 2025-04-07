@@ -147,48 +147,48 @@ If the file doesn't exist, the AI agent will receive an error message that it ca
 
 ### Setup
 
-Clone the repository and install development dependencies:
+Clone the repository and install Hatch:
 
 ```bash
 git clone https://github.com/aws/click-mcp.git
 cd click-mcp
-pip install -e ".[dev]"
-```
-
-Or with UV (faster installation):
-
-```bash
-git clone https://github.com/aws/click-mcp.git
-cd click-mcp
-uv pip install -e ".[dev]"
+pip install hatch
 ```
 
 ### Testing
 
-Run tests with pytest:
+Run tests with Hatch:
 
 ```bash
-pytest
+# Run all tests
+hatch run test:run
+
+# Run tests with coverage
+hatch run test:cov
 ```
 
-Run tests with coverage:
+### Code Quality
+
+Code quality checks are automatically run as part of the CI pipeline:
+
+- **Black**: Code formatting is checked and applied
+- **Pylint**: Linting checks are run to ensure code quality
+- **Pytest**: Tests are run to verify functionality
+
+You can also run these checks manually:
 
 ```bash
-pytest --cov=click_mcp
-```
+# Format code with black
+hatch run lint:format
 
-### Code Formatting
+# Check formatting without changing files
+hatch run lint:style
 
-Format code with black:
+# Run linting checks
+hatch run lint:check
 
-```bash
-black click_mcp tests
-```
-
-Run linting checks:
-
-```bash
-flake8 click_mcp tests
+# Run all code quality checks
+hatch run lint:all
 ```
 
 ### Building
@@ -196,14 +196,7 @@ flake8 click_mcp tests
 Build the package:
 
 ```bash
-python -m build
-```
-
-Or with UV:
-
-```bash
-uv pip install build
-python -m build
+hatch build
 ```
 
 ### Documentation

@@ -15,15 +15,16 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: '3.x'
-    - name: Install UV
+    - name: Install Hatch
       run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    - name: Install dependencies
+        python -m pip install --upgrade pip
+        pip install hatch
+    - name: Format and Lint
       run: |
-        uv pip install build
+        hatch run lint:all
     - name: Build package
-      run: python -m build
+      run: |
+        hatch build
     - name: Publish package
       uses: pypa/gh-action-pypi-publish@release/v1
       # No credentials needed for trusted publishing

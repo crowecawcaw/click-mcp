@@ -20,24 +20,13 @@ jobs:
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - name: Install UV
+    - name: Install Hatch
       run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-    - name: Install dependencies
+        python -m pip install --upgrade pip
+        pip install hatch
+    - name: Format and Lint
       run: |
-        uv pip install pytest pytest-cov black pylint
-        if [ -f requirements.txt ]; then uv pip install -r requirements.txt; fi
-        uv pip install -e .
-    - name: Format with black
-      run: |
-        black click_mcp tests
-    - name: Lint with black
-      run: |
-        black --check click_mcp tests
-    - name: Lint with pylint
-      run: |
-        pylint click_mcp tests
+        hatch run lint:all
     - name: Test with pytest
       run: |
-        pytest --cov=click_mcp tests/
+        hatch run test:cov
