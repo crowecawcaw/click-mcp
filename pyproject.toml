@@ -35,6 +35,12 @@ Issues = "https://github.com/crowecawcaw/click-mcp/issues"
 [tool.hatch.build.targets.wheel]
 packages = ["click_mcp"]
 
+[tool.hatch.build.hooks.check]
+dependencies = ["black", "pylint", "pytest", "pytest-cov"]
+test = "pytest --cov=click_mcp tests/"
+style = "black --check click_mcp tests"
+lint = "pylint click_mcp tests"
+
 [tool.hatch.version]
 path = "click_mcp/_version.py"
 
@@ -67,13 +73,6 @@ style = "black --check click_mcp tests"
 format = "black click_mcp tests"
 check = "pylint click_mcp tests"
 all = ["format", "check"]
-
-# This is the key part that runs checks before building
-[tool.hatch.build.hooks.check]
-dependencies = ["black", "pylint", "pytest", "pytest-cov"]
-test = "pytest --cov=click_mcp tests/"
-style = "black --check click_mcp tests"
-lint = "pylint click_mcp tests"
 
 [tool.black]
 target-version = ['py38', 'py39', 'py310', 'py311', 'py312', 'py313']
