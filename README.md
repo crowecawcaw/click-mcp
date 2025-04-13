@@ -30,7 +30,7 @@ pip install click-mcp
 import click
 from click_mcp import click_mcp
 
-@click_mcp
+@click_mcp(server_name="my-cli-app")
 @click.group()
 def cli():
     """Sample CLI application."""
@@ -92,6 +92,23 @@ This can be useful when:
 - The name "mcp" conflicts with an existing command
 - You want a more descriptive command name
 - You're integrating with a specific AI agent that expects a certain command name
+
+### Customizing the MCP Server Name
+
+You can also customize the name of the MCP server that's reported to clients:
+
+```python
+@click_mcp(server_name="my-custom-tool")
+@click.group()
+def cli():
+    """Sample CLI application with custom server name."""
+    pass
+```
+
+This can be useful when:
+- You want to provide a more descriptive name for your tool
+- You're integrating with systems that use the server name for identification
+- You want to distinguish between different MCP-enabled applications
 
 ### Working with Nested Command Groups
 

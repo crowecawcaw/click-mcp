@@ -1,135 +1,133 @@
 """
-MCP server implementation for Click applications.
+MCP server implementation for Click applications using the MCP library.
 """
 
-import json
-import sys
-import io
+import asyncio
 import contextlib
-from typing import Dict, Any
+import io
+from typing import Any, Dict, Iterable, List, Optional, cast
 
-from .scanner import scan_click_command
+import click
+import mcp.types as types
+from mcp.server import stdio
+from mcp.server.lowlevel import Server
+
 from .decorator import get_mcp_metadata
+from .scanner import scan_click_command
 
 
-class MCPServer:  # pylint: disable=too-few-public-methods
+class MCPServer:
     """MCP server for Click applications."""
 
-    def __init__(self, cli_group):
+    def __init__(self, cli_group: click.Group, server_name: str = "click-mcp"):
         """
         Initialize the MCP server.
 
         Args:
             cli_group: A Click group to expose as MCP tools.
+            server_name: The name of the MCP server.
         """
         self.cli_group = cli_group
-        self.tools = scan_click_command(cli_group)
-        self.tool_map = {tool["name"]: tool for tool in self.tools}
+        self.server_name = server_name
+        self.click_tools = scan_click_command(cli_group)
+        self.tool_map = {tool.name: tool for tool in self.click_tools}
+        self.server: Server = Server(server_name)
 
-    def run(self):
+        # Register MCP handlers
+        self.server.list_tools()(self._handle_list_tools)
+        self.server.call_tool()(self._handle_call_tool)
+
+    def run(self) -> None:
         """Run the MCP server with stdio transport."""
-        self._send_response(
-            {"type": "server_info", "version": "1.0", "tools": self.tools}
-        )
+        asyncio.run(self._run_server())
 
-        for line in sys.stdin:
-            try:
-                request = json.loads(line)
-
-                if request["type"] == "invoke":
-                    self._handle_invoke(request)
-                else:
-                    self._send_error(f"Unknown request type: {request['type']}")
-            except json.JSONDecodeError:
-                self._send_error("Invalid JSON request")
-            except Exception as e:  # pylint: disable=broad-except
-                self._send_error(f"Error processing request: {str(e)}")
-
-    def _handle_invoke(self, request):
-        try:
-            tool_name = request["tool"]
-            parameters = request.get("parameters", {})
-
-            if tool_name not in self.tool_map:
-                self._send_error(f"Unknown tool: {tool_name}")
-                return
-
-            result = self._execute_command(tool_name, parameters)
-
-            self._send_response(
-                {"type": "invoke_response", "id": request.get("id"), "result": result}
+    async def _run_server(self) -> None:
+        """Run the MCP server asynchronously."""
+        async with stdio.stdio_server() as (read_stream, write_stream):
+            await self.server.run(
+                read_stream,
+                write_stream,
+                self.server.create_initialization_options(),
             )
-        except Exception as e:  # pylint: disable=broad-except
-            self._send_error(f"Error invoking tool {request.get('tool')}: {str(e)}")
+
+    async def _handle_list_tools(self) -> List[types.Tool]:
+        """Handle the list_tools request."""
+        return self.click_tools
+
+    async def _handle_call_tool(
+        self, name: str, arguments: Optional[Dict[str, Any]]
+    ) -> Iterable[types.TextContent]:
+        """Handle the call_tool request."""
+        if name not in self.tool_map:
+            raise ValueError(f"Unknown tool: {name}")
+
+        arguments = arguments or {}
+        result = self._execute_command(name, arguments)
+        return [types.TextContent(type="text", text=result["output"])]
 
     def _execute_command(
         self, tool_name: str, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
-        # pylint: disable=too-many-locals,too-many-branches
-        # Parse the tool name to get the command path
-        command_path = tool_name.split(".")
+        """Execute a Click command and return its output."""
+        command = self._find_command(self.cli_group, tool_name.split("."))
+        args = self._build_command_args(command, parameters)
 
-        # Find the command in the CLI group
-        command = self._find_command(self.cli_group, command_path)
+        # Capture and return command output
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            try:
+                ctx = command.make_context(command.name, args)
+                command.invoke(ctx)
+            except Exception as e:
+                raise ValueError(f"Command execution failed: {str(e)}") from e
 
-        # Build command arguments
-        args = []
-        positional_args = []
+        return {"output": output.getvalue().rstrip()}
 
-        # Separate options and arguments
-        option_names = set()
-        argument_names = set()
+    def _build_command_args(
+        self, command: click.Command, parameters: Dict[str, Any]
+    ) -> List[str]:
+        """Build command arguments from parameters."""
+        args: List[str] = []
+        positional_args: List[tuple[str, Any]] = []
 
-        for param in command.params:
-            if hasattr(param, "opts"):  # It's an option
-                option_names.add(param.name)
-            else:  # It's an argument
-                argument_names.add(param.name)
+        # Classify parameters
+        option_names = {p.name for p in command.params if hasattr(p, "opts")}
+        argument_names = {p.name for p in command.params if not hasattr(p, "opts")}
 
         # Process options
-        for param_name, param_value in parameters.items():
-            if param_name in option_names:
-                param = next(p for p in command.params if p.name == param_name)
+        for name, value in parameters.items():
+            if name in option_names:
+                param = next(p for p in command.params if p.name == name)
 
                 # Handle boolean flags
                 if hasattr(param, "is_flag") and param.is_flag:
-                    if param_value:
-                        args.append(f"--{param_name}")
-                # Handle regular options
+                    if value:
+                        args.append(f"--{name}")
                 else:
-                    args.append(f"--{param_name}")
-                    args.append(str(param_value))
-            elif param_name in argument_names:
-                # Store arguments separately to add them in the correct order
-                positional_args.append((param_name, param_value))
+                    args.append(f"--{name}")
+                    args.append(str(value))
+            elif name in argument_names:
+                positional_args.append((name, value))
 
-        # Add positional arguments in the correct order
+        # Add positional arguments in correct order
         for param in command.params:
             if param.name in argument_names:
                 for arg_name, arg_value in positional_args:
                     if arg_name == param.name:
                         args.append(str(arg_value))
 
-        # Capture the command output
-        output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            try:
-                # Create a new context and invoke the command
-                ctx = command.make_context(command.name, args)
-                command.invoke(ctx)
-            except Exception as e:  # pylint: disable=broad-except
-                raise ValueError(f"Command execution failed: {str(e)}") from e
+        return args
 
-        # Return the captured output
-        return {"output": output.getvalue().rstrip()}
-
-    def _find_command(self, group, path):
+    def _find_command(self, group: click.Group, path: List[str]) -> click.Command:
         """Find a command in a group by path."""
         if not path:
             return group
 
-        current = path[0]
-        remaining = path[1:]
+        # Handle the case where the first element is the group name itself
+        if path[0] == group.name:
+            return self._find_command(group, path[1:])
+
+        current, *remaining = path
 
         # Try to find the command by name
         if current in group.commands:
@@ -139,20 +137,19 @@ class MCPServer:  # pylint: disable=too-few-public-methods
             cmd = None
             for cmd_name, command in group.commands.items():
                 # Check command metadata
-                metadata = get_mcp_metadata(cmd_name)
-                if metadata.get("name") == current:
+                if get_mcp_metadata(cmd_name).get("name") == current:
                     cmd = command
                     break
 
                 # Check callback metadata
-                if hasattr(command, "callback") and hasattr(
-                    command.callback, "_mcp_metadata"
+                if (
+                    hasattr(command, "callback")
+                    and command.callback is not None
+                    and hasattr(command.callback, "_mcp_metadata")
+                    and command.callback._mcp_metadata.get("name") == current
                 ):
-                    # pylint: disable=protected-access
-                    callback_metadata = command.callback._mcp_metadata
-                    if callback_metadata.get("name") == current:
-                        cmd = command
-                        break
+                    cmd = command
+                    break
 
             if cmd is None:
                 raise ValueError(f"Command not found: {current}")
@@ -163,14 +160,7 @@ class MCPServer:  # pylint: disable=too-few-public-methods
 
         # If this is the last segment, return the command
         if not remaining:
-            return cmd
+            return cast(click.Command, cmd)
 
         # Otherwise, continue searching in the subgroup
-        return self._find_command(cmd, remaining)
-
-    def _send_response(self, response: Dict[str, Any]):
-        sys.stdout.write(json.dumps(response) + "\n")
-        sys.stdout.flush()
-
-    def _send_error(self, message: str):
-        self._send_response({"type": "error", "message": message})
+        return self._find_command(cast(click.Group, cmd), remaining)
