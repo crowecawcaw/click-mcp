@@ -67,8 +67,13 @@ async def test_basic_server_tools(basic_mcp_session):
             break
 
     assert greet_tool is not None
-    assert "name" in greet_tool.inputSchema
-    assert greet_tool.inputSchema["name"]["required"] is True
+    # Verify inputSchema structure
+    assert greet_tool.inputSchema["type"] == "object"
+    assert "properties" in greet_tool.inputSchema
+    assert "name" in greet_tool.inputSchema["properties"]
+    assert greet_tool.inputSchema["properties"]["name"]["required"] is True
+    assert "required" in greet_tool.inputSchema
+    assert "name" in greet_tool.inputSchema["required"]
 
     # Find the users.list command
     users_list_tool = None
@@ -78,6 +83,14 @@ async def test_basic_server_tools(basic_mcp_session):
             break
 
     assert users_list_tool is not None
+    # Verify inputSchema structure (should only have help param)
+    assert users_list_tool.inputSchema["type"] == "object"
+    assert "properties" in users_list_tool.inputSchema
+    # Click automatically adds --help, so we expect only that property
+    assert len(users_list_tool.inputSchema["properties"]) <= 1
+    if len(users_list_tool.inputSchema["properties"]) == 1:
+        assert "help" in users_list_tool.inputSchema["properties"]
+    assert "required" not in users_list_tool.inputSchema  # No required params
 
     # Find the echo command
     echo_tool = None
@@ -87,9 +100,14 @@ async def test_basic_server_tools(basic_mcp_session):
             break
 
     assert echo_tool is not None
-    assert "count" in echo_tool.inputSchema
-    assert echo_tool.inputSchema["count"]["schema"]["type"] == "integer"
-    assert "message" in echo_tool.inputSchema
+    # Verify inputSchema structure
+    assert echo_tool.inputSchema["type"] == "object"
+    assert "properties" in echo_tool.inputSchema
+    assert "count" in echo_tool.inputSchema["properties"]
+    assert echo_tool.inputSchema["properties"]["count"]["schema"]["type"] == "integer"
+    assert "message" in echo_tool.inputSchema["properties"]
+    assert "required" in echo_tool.inputSchema
+    assert "message" in echo_tool.inputSchema["required"]  # Only message is required
 
 
 @pytest.mark.anyio
@@ -234,8 +252,14 @@ async def test_advanced_server_tools(advanced_mcp_session):
             break
 
     assert config_set_tool is not None
-    assert "key" in config_set_tool.inputSchema
-    assert "value" in config_set_tool.inputSchema
+    # Verify inputSchema structure
+    assert config_set_tool.inputSchema["type"] == "object"
+    assert "properties" in config_set_tool.inputSchema
+    assert "key" in config_set_tool.inputSchema["properties"]
+    assert "value" in config_set_tool.inputSchema["properties"]
+    assert "required" in config_set_tool.inputSchema
+    assert "key" in config_set_tool.inputSchema["required"]
+    assert "value" in config_set_tool.inputSchema["required"]
 
     # Find the greet command with formal option
     greet_tool = None
@@ -245,8 +269,14 @@ async def test_advanced_server_tools(advanced_mcp_session):
             break
 
     assert greet_tool is not None
-    assert "formal" in greet_tool.inputSchema
-    assert greet_tool.inputSchema["formal"]["schema"]["type"] == "boolean"
+    # Verify inputSchema structure
+    assert greet_tool.inputSchema["type"] == "object"
+    assert "properties" in greet_tool.inputSchema
+    assert "name" in greet_tool.inputSchema["properties"]
+    assert "formal" in greet_tool.inputSchema["properties"]
+    assert greet_tool.inputSchema["properties"]["formal"]["schema"]["type"] == "boolean"
+    assert "required" in greet_tool.inputSchema
+    assert "name" in greet_tool.inputSchema["required"]  # Only name is required
 
 
 @pytest.fixture

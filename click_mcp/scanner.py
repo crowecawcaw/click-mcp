@@ -60,18 +60,30 @@ def _convert_command_info_to_tool(
     """Convert a Click command info dict to an MCP tool."""
     description = command_info.get("help") or command_info.get("short_help") or ""
 
-    parameters: Dict[str, Dict[str, Any]] = {}
+    properties: Dict[str, Dict[str, Any]] = {}
+    required_params: List[str] = []
+
     for param_info in command_info.get("params", []):
         param_name = param_info.get("name")
         if param_name:
             param_data = _get_parameter_info_from_dict(param_info)
             if param_data:
-                parameters[param_name] = param_data
+                properties[param_name] = param_data
+                if param_data.get("required", False):
+                    required_params.append(param_name)
+
+    # Construct the final input schema according to JSON Schema / MCP spec
+    input_schema: Dict[str, Any] = {
+        "type": "object",
+        "properties": properties,
+    }
+    if required_params:
+        input_schema["required"] = sorted(required_params)  # Sort for consistent output
 
     return types.Tool(
         name=name,
         description=description,
-        inputSchema=parameters,
+        inputSchema=input_schema,
     )
 
 
@@ -99,12 +111,15 @@ def _get_parameter_info_from_dict(
     if "choices" in param_info:
         schema["enum"] = param_info["choices"]
 
-    # Create parameter info
+    # Create parameter info (this represents the schema for a single property)
     param_data = {
         "description": param_info.get("help", ""),
-        "required": param_info.get("required", False),
         "schema": schema,
     }
+    # Add 'required' flag separately for collecting at the top level
+    is_required = param_info.get("required", False)
+    if is_required:
+        param_data["required"] = True  # Keep track for the loop above
 
     # Add default if available and not callable
     default = param_info.get("default")

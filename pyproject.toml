@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "click-mcp"
-version = "0.2.0"
+version = "0.3.0"
 description = "Extend Click applications with Model Context Protocol (MCP) support"
 readme = "README.md"
 authors = [
@@ -33,9 +33,6 @@ Issues = "https://github.com/crowecawcaw/click-mcp/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["click_mcp"]
-
-[tool.hatch.version]
-path = "click_mcp/_version.py"
 
 [tool.black]
 target-version = ['py310', 'py311', 'py312', 'py313']
