@@ -65,5 +65,19 @@ def process(format, filename):
     click.echo(f"Processing {filename} in {format} format")
 
 
+@cli.command()
+@click.argument("source")
+@click.argument("destination")
+@click.option("--overwrite", is_flag=True, help="Overwrite destination if it exists")
+def copy(source, destination, overwrite):
+    """Copy a file from source to destination.
+
+    SOURCE is the path to the source file.
+    DESTINATION is the path where the file will be copied.
+    """
+    action = "Overwriting" if overwrite else "Copying"
+    click.echo(f"{action} {source} to {destination}")
+
+
 if __name__ == "__main__":
     cli()

@@ -342,6 +342,64 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     assert len(result.content) > 0
     assert result.content[0].text == "Setting test=value"
 
+    # Find the config.get command with positional argument
+    config_get_tool = None
+    for tool in tools:
+        if "config.get" in tool.name.lower():
+            config_get_tool = tool
+            break
+
+    assert config_get_tool is not None
+    # Verify inputSchema structure for positional arguments
+    assert config_get_tool.inputSchema["type"] == "object"
+    assert "properties" in config_get_tool.inputSchema
+    assert "key" in config_get_tool.inputSchema["properties"]
+    assert "required" in config_get_tool.inputSchema
+    assert "key" in config_get_tool.inputSchema["required"]
+
+    # Invoke the command with positional argument
+    result = await advanced_mcp_session.call_tool(
+        config_get_tool.name, {"key": "test-key"}
+    )
+    assert result is not None
+    assert len(result.content) > 0
+    assert "Value for test-key: example_value" in result.content[0].text
+
+    # Find the copy command with multiple positional arguments
+    copy_tool = None
+    for tool in tools:
+        if "copy" in tool.name.lower():
+            copy_tool = tool
+            break
+
+    assert copy_tool is not None
+    # Verify inputSchema structure for multiple positional arguments
+    assert copy_tool.inputSchema["type"] == "object"
+    assert "properties" in copy_tool.inputSchema
+    assert "source" in copy_tool.inputSchema["properties"]
+    assert "destination" in copy_tool.inputSchema["properties"]
+    assert "overwrite" in copy_tool.inputSchema["properties"]
+    assert "required" in copy_tool.inputSchema
+    assert "source" in copy_tool.inputSchema["required"]
+    assert "destination" in copy_tool.inputSchema["required"]
+
+    # Invoke the command with positional arguments
+    result = await advanced_mcp_session.call_tool(
+        copy_tool.name, {"source": "file.txt", "destination": "/tmp/file.txt"}
+    )
+    assert result is not None
+    assert len(result.content) > 0
+    assert "Copying file.txt to /tmp/file.txt" in result.content[0].text
+
+    # Test with option
+    result = await advanced_mcp_session.call_tool(
+        copy_tool.name,
+        {"source": "file.txt", "destination": "/tmp/file.txt", "overwrite": True},
+    )
+    assert result is not None
+    assert len(result.content) > 0
+    assert "Overwriting file.txt to /tmp/file.txt" in result.content[0].text
+
     # Find the greet command
     greet_tool = None
     for tool in tools:

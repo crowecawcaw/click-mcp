@@ -16,6 +16,7 @@ The [Model Context Protocol (MCP)](https://github.com/model-context-protocol/mcp
 - Simple `@click_mcp` decorator syntax
 - Automatic conversion of Click commands to MCP tools
 - Support for nested command groups
+- Support for positional arguments
 - Stdio-based MCP server for easy integration
 
 ## Installation
@@ -140,6 +141,65 @@ def delete(username):
 ```
 
 When exposed as MCP tools, the nested commands will be available with their full path using dot notation (e.g., "users.create" and "users.delete").
+
+### Working with Positional Arguments
+
+Click supports positional arguments using `@click.argument()`. When these are converted to MCP tools, they are represented as named parameters in the schema:
+
+```python
+@cli.command()
+@click.argument('source')
+@click.argument('destination')
+@click.option('--overwrite', is_flag=True, help='Overwrite destination if it exists')
+def copy(source, destination, overwrite):
+    """Copy a file from source to destination."""
+    click.echo(f"Copying {source} to {destination}")
+```
+
+This command is converted to an MCP tool with the following schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "source": {
+      "description": "",
+      "schema": { "type": "string" },
+      "required": true
+    },
+    "destination": {
+      "description": "",
+      "schema": { "type": "string" },
+      "required": true
+    },
+    "overwrite": {
+      "description": "Overwrite destination if it exists",
+      "schema": { "type": "boolean" }
+    }
+  },
+  "required": ["source", "destination"]
+}
+```
+
+The positional nature of arguments is handled internally by `click-mcp`. When invoking the command, you can use named parameters:
+
+```json
+{
+  "type": "invoke",
+  "tool": "copy",
+  "parameters": {
+    "source": "file.txt",
+    "destination": "/tmp/file.txt",
+    "overwrite": true
+  }
+}
+```
+
+The MCP server will correctly convert these to positional arguments when executing the Click command:
+
+```
+copy file.txt /tmp/file.txt --overwrite
+```
 
 ### Handling Command Errors
 

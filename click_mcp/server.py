@@ -13,7 +13,7 @@ from mcp.server import stdio
 from mcp.server.lowlevel import Server
 
 from .decorator import get_mcp_metadata
-from .scanner import scan_click_command
+from .scanner import get_positional_args, scan_click_command
 
 
 class MCPServer:
@@ -70,7 +70,7 @@ class MCPServer:
     ) -> Dict[str, Any]:
         """Execute a Click command and return its output."""
         command = self._find_command(self.cli_group, tool_name.split("."))
-        args = self._build_command_args(command, parameters)
+        args = self._build_command_args(command, tool_name, parameters)
 
         # Capture and return command output
         output = io.StringIO()
@@ -84,37 +84,29 @@ class MCPServer:
         return {"output": output.getvalue().rstrip()}
 
     def _build_command_args(
-        self, command: click.Command, parameters: Dict[str, Any]
+        self, command: click.Command, tool_name: str, parameters: Dict[str, Any]
     ) -> List[str]:
         """Build command arguments from parameters."""
         args: List[str] = []
-        positional_args: List[tuple[str, Any]] = []
 
-        # Classify parameters
-        option_names = {p.name for p in command.params if hasattr(p, "opts")}
-        argument_names = {p.name for p in command.params if not hasattr(p, "opts")}
+        # Get positional arguments for this tool
+        positional_order = get_positional_args(tool_name)
 
-        # Process options
+        # First, handle positional arguments in the correct order
+        for param_name in positional_order:
+            if param_name in parameters:
+                args.append(str(parameters[param_name]))
+
+        # Then handle options (non-positional parameters)
         for name, value in parameters.items():
-            if name in option_names:
-                param = next(p for p in command.params if p.name == name)
-
+            if name not in positional_order:  # Skip positional args already processed
                 # Handle boolean flags
-                if hasattr(param, "is_flag") and param.is_flag:
+                if isinstance(value, bool):
                     if value:
                         args.append(f"--{name}")
                 else:
                     args.append(f"--{name}")
                     args.append(str(value))
-            elif name in argument_names:
-                positional_args.append((name, value))
-
-        # Add positional arguments in correct order
-        for param in command.params:
-            if param.name in argument_names:
-                for arg_name, arg_value in positional_args:
-                    if arg_name == param.name:
-                        args.append(str(arg_value))
 
         return args
 
