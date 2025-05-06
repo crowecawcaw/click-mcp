@@ -3,11 +3,36 @@ Scanner for Click commands to convert them to MCP tools.
 """
 
 from typing import Any, Dict, List, Optional
+import re
 
 import click
 import mcp.types as types
 
 from .decorator import get_mcp_metadata
+
+
+def sanitize_tool_name(name: str) -> str:
+    """
+    Sanitize a tool name to conform to the regex pattern [a-zA-Z][a-zA-Z0-9_]*
+    
+    Args:
+        name: The tool name to sanitize
+        
+    Returns:
+        A sanitized tool name that conforms to the pattern
+    """
+    # Replace any non-alphanumeric characters (except underscore) with underscore
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    
+    # Ensure the name starts with a letter
+    if sanitized and not re.match(r'^[a-zA-Z]', sanitized):
+        sanitized = 'tool_' + sanitized
+    
+    # Handle empty string case
+    if not sanitized:
+        sanitized = 'tool'
+        
+    return sanitized
 
 
 # Dictionary to store positional arguments for each tool
@@ -40,14 +65,15 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
 
         # Determine command path
         custom_name = metadata.get("name", name)
-        # Ensure paths use underscore separator instead of dot
-        cmd_path = _sanitize_tool_name(f"{parent_path}{custom_name}" if parent_path else custom_name)
+        custom_name = sanitize_tool_name(custom_name)
+        cmd_path = f"{parent_path}{custom_name}" if parent_path else custom_name
 
         if "commands" in cmd_info:
             # Handle subgroup
             cmd = command.get_command(ctx, name)
             if isinstance(cmd, click.Group):
                 group_name = metadata.get("name", name)
+                group_name = sanitize_tool_name(group_name)
                 group_path = (
                     f"{parent_path}{group_name}_" if parent_path else f"{group_name}_"
                 )
@@ -68,43 +94,14 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
 
 
 def get_positional_args(tool_name: str) -> List[str]:
-    # Sanitize the tool name to ensure consistency with how they're stored
-    sanitized_name = _sanitize_tool_name(tool_name)
-    return _tool_positional_args.get(sanitized_name, [])
+    return _tool_positional_args.get(tool_name, [])
 
-
-def _sanitize_tool_name(name: str) -> str:
-    """
-    Sanitize tool name to conform to regex [a-zA-Z][a-zA-Z0-9_]*
-    
-    Args:
-        name: The original tool name
-        
-    Returns:
-        A sanitized name that conforms to the regex
-    """
-    # Replace any non-alphanumeric characters with underscore (except we keep existing underscores)
-    import re
-    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
-    
-    # Ensure first character is a letter
-    if sanitized and not sanitized[0].isalpha():
-        sanitized = 'tool_' + sanitized
-    
-    # Handle empty name
-    if not sanitized:
-        sanitized = 'tool'
-        
-    return sanitized
 
 def _convert_command_to_tool(
     command: click.Command, command_info: Dict[str, Any], name: str
 ) -> tuple[types.Tool, List[str]]:
     """
     Convert a Click command to an MCP tool.
-
-    Returns:
-        A tuple of (Tool, positional_args_list)
     """
     description = command_info.get("help") or command_info.get("short_help") or ""
 
@@ -138,7 +135,7 @@ def _convert_command_to_tool(
         input_schema["required"] = sorted(required_params)  # Sort for consistent output
 
     tool = types.Tool(
-        name=_sanitize_tool_name(name),
+        name=sanitize_tool_name(name),
         description=description,
         inputSchema=input_schema,
     )
