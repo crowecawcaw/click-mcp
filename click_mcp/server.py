@@ -69,7 +69,11 @@ class MCPServer:
         self, tool_name: str, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
         """Execute a Click command and return its output."""
-        command = self._find_command(self.cli_group, tool_name.split("."))
+        # Get the original command path
+        from .scanner import get_original_path
+
+        original_path = get_original_path(tool_name)
+        command = self._find_command(self.cli_group, original_path.split("."))
         args = self._build_command_args(command, tool_name, parameters)
 
         # Capture and return command output

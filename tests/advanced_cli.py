@@ -52,6 +52,13 @@ def get(key):
     click.echo(f"Value for {key}: example_value")
 
 
+@config.command()
+@click.argument("key")
+def get_value(key):
+    """Get a configuration value with underscore in command name."""
+    click.echo(f"Value for {key} (from get_value): example_value")
+
+
 @cli.command()
 @click.option(
     "--format",
