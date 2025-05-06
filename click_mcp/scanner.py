@@ -9,9 +9,32 @@ import mcp.types as types
 
 from .decorator import get_mcp_metadata
 
-
 # Dictionary to store positional arguments for each tool
 _tool_positional_args: Dict[str, List[str]] = {}
+
+# Dictionary to store mapping between sanitized tool names and original paths
+_original_paths: Dict[str, str] = {}
+
+
+def sanitize_tool_name(name: str) -> str:
+    """
+    Sanitize a tool name to conform to the regex pattern [a-zA-Z][a-zA-Z0-9_]*
+    """
+    import re
+
+    sanitized = name.replace(".", "_")
+
+    if sanitized and not re.match(r"^[a-zA-Z]", sanitized):
+        sanitized = "tool_" + sanitized
+
+    sanitized = re.sub(r"[^a-zA-Z0-9_]", "_", sanitized)
+
+    return sanitized
+
+
+def get_original_path(sanitized_name: str) -> str:
+    """Get the original command path from a sanitized tool name."""
+    return _original_paths.get(sanitized_name, sanitized_name)
 
 
 def scan_click_command(command: click.Group, parent_path: str = "") -> List[types.Tool]:
@@ -47,6 +70,7 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
             cmd = command.get_command(ctx, name)
             if isinstance(cmd, click.Group):
                 group_name = metadata.get("name", name)
+                # Use underscore for path separator in sanitized paths
                 group_path = (
                     f"{parent_path}{group_name}." if parent_path else f"{group_name}."
                 )
@@ -55,8 +79,13 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
             # Handle command
             cmd = command.get_command(ctx, name)
             if cmd is not None:
+                # Sanitize the command path to conform to the regex pattern
+                sanitized_cmd_path = sanitize_tool_name(cmd_path)
+                # Store the mapping between sanitized name and original path
+                _original_paths[sanitized_cmd_path] = cmd_path
+
                 tool, positional_args = _convert_command_to_tool(
-                    cmd, cmd_info, cmd_path
+                    cmd, cmd_info, sanitized_cmd_path
                 )
                 tools.append(tool)
                 # Store positional arguments in the global dictionary

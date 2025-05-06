@@ -75,10 +75,10 @@ async def test_basic_server_tools(basic_mcp_session):
     assert "required" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["required"]
 
-    # Find the users.list command
+    # Find the users_list command
     users_list_tool = None
     for tool in tools:
-        if "users.list" in tool.name.lower():
+        if "users_list" in tool.name.lower():
             users_list_tool = tool
             break
 
@@ -136,15 +136,15 @@ async def test_invoke_greet_command(basic_mcp_session):
 
 @pytest.mark.anyio
 async def test_invoke_users_list_command(basic_mcp_session):
-    """Test invoking the users.list command."""
+    """Test invoking the users_list command."""
     # Get tools
     result = await basic_mcp_session.list_tools()
     tools = result.tools
 
-    # Find the users.list command
+    # Find the users_list command
     users_list_tool = None
     for tool in tools:
-        if "users.list" in tool.name.lower():
+        if "users_list" in tool.name.lower():
             users_list_tool = tool
             break
 
@@ -244,10 +244,10 @@ async def test_advanced_server_tools(advanced_mcp_session):
     tools = result.tools
     assert len(tools) > 0
 
-    # Find the config.set command
+    # Find the config_set command
     config_set_tool = None
     for tool in tools:
-        if "config.set" in tool.name.lower():
+        if "config_set" in tool.name.lower():
             config_set_tool = tool
             break
 
@@ -324,10 +324,10 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     result = await advanced_mcp_session.list_tools()
     tools = result.tools
 
-    # Find the config.set command
+    # Find the config_set command
     config_set_tool = None
     for tool in tools:
-        if "config.set" in tool.name.lower():
+        if "config_set" in tool.name.lower():
             config_set_tool = tool
             break
 
@@ -342,10 +342,10 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     assert len(result.content) > 0
     assert result.content[0].text == "Setting test=value"
 
-    # Find the config.get command with positional argument
+    # Find the config_get command with positional argument
     config_get_tool = None
     for tool in tools:
-        if "config.get" in tool.name.lower():
+        if "config_get" in tool.name.lower():
             config_get_tool = tool
             break
 
@@ -364,6 +364,29 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     assert result is not None
     assert len(result.content) > 0
     assert "Value for test-key: example_value" in result.content[0].text
+
+    # Find the config_get_value command with underscore in name
+    config_get_value_tool = None
+    for tool in tools:
+        if "get_value" in tool.name.lower():
+            config_get_value_tool = tool
+            break
+
+    assert config_get_value_tool is not None
+    # Verify inputSchema structure for positional arguments
+    assert config_get_value_tool.inputSchema["type"] == "object"
+    assert "properties" in config_get_value_tool.inputSchema
+    assert "key" in config_get_value_tool.inputSchema["properties"]
+    assert "required" in config_get_value_tool.inputSchema
+    assert "key" in config_get_value_tool.inputSchema["required"]
+
+    # Invoke the command with positional argument
+    result = await advanced_mcp_session.call_tool(
+        config_get_value_tool.name, {"key": "underscore-key"}
+    )
+    assert result is not None
+    assert len(result.content) > 0
+    assert "Value for underscore-key (from get_value)" in result.content[0].text
 
     # Find the copy command with multiple positional arguments
     copy_tool = None
