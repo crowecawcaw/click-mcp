@@ -78,7 +78,7 @@ async def test_basic_server_tools(basic_mcp_session):
     # Find the users.list command
     users_list_tool = None
     for tool in tools:
-        if "users.list" in tool.name.lower():
+        if "users_list" in tool.name.lower():
             users_list_tool = tool
             break
 
@@ -141,10 +141,10 @@ async def test_invoke_users_list_command(basic_mcp_session):
     result = await basic_mcp_session.list_tools()
     tools = result.tools
 
-    # Find the users.list command
+    # Find the users_list command
     users_list_tool = None
     for tool in tools:
-        if "users.list" in tool.name.lower():
+        if "users_list" in tool.name.lower():
             users_list_tool = tool
             break
 
@@ -244,7 +244,7 @@ async def test_advanced_server_tools(advanced_mcp_session):
     tools = result.tools
     assert len(tools) > 0
 
-    # Find the config.set command
+    # Find the config_set command
     config_set_tool = None
     for tool in tools:
         if "config.set" in tool.name.lower():
@@ -324,7 +324,7 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     result = await advanced_mcp_session.list_tools()
     tools = result.tools
 
-    # Find the config.set command
+    # Find the config_set command
     config_set_tool = None
     for tool in tools:
         if "config.set" in tool.name.lower():

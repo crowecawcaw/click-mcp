@@ -41,7 +41,7 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
         # Determine command path
         custom_name = metadata.get("name", name)
         # Ensure paths use underscore separator instead of dot
-        cmd_path = f"{parent_path}{custom_name}" if parent_path else custom_name
+        cmd_path = _sanitize_tool_name(f"{parent_path}{custom_name}" if parent_path else custom_name)
 
         if "commands" in cmd_info:
             # Handle subgroup

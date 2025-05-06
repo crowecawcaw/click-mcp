@@ -119,7 +119,9 @@ class MCPServer:
         if path[0] == group.name:
             return self._find_command(group, path[1:])
 
-        current, *remaining = path
+        # Convert underscore-separated path back to dot notation for lookups
+        current = path[0].replace('_', '.')
+        remaining = path[1:]
 
         # Try to find the command by name
         if current in group.commands:
