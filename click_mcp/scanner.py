@@ -40,6 +40,7 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
 
         # Determine command path
         custom_name = metadata.get("name", name)
+        # Ensure paths use underscore separator instead of dot
         cmd_path = f"{parent_path}{custom_name}" if parent_path else custom_name
 
         if "commands" in cmd_info:
@@ -48,7 +49,7 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
             if isinstance(cmd, click.Group):
                 group_name = metadata.get("name", name)
                 group_path = (
-                    f"{parent_path}{group_name}." if parent_path else f"{group_name}."
+                    f"{parent_path}{group_name}_" if parent_path else f"{group_name}_"
                 )
                 tools.extend(scan_click_command(cmd, group_path))
         else:
@@ -67,8 +68,34 @@ def scan_click_command(command: click.Group, parent_path: str = "") -> List[type
 
 
 def get_positional_args(tool_name: str) -> List[str]:
-    return _tool_positional_args.get(tool_name, [])
+    # Sanitize the tool name to ensure consistency with how they're stored
+    sanitized_name = _sanitize_tool_name(tool_name)
+    return _tool_positional_args.get(sanitized_name, [])
 
+
+def _sanitize_tool_name(name: str) -> str:
+    """
+    Sanitize tool name to conform to regex [a-zA-Z][a-zA-Z0-9_]*
+    
+    Args:
+        name: The original tool name
+        
+    Returns:
+        A sanitized name that conforms to the regex
+    """
+    # Replace any non-alphanumeric characters with underscore (except we keep existing underscores)
+    import re
+    sanitized = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    
+    # Ensure first character is a letter
+    if sanitized and not sanitized[0].isalpha():
+        sanitized = 'tool_' + sanitized
+    
+    # Handle empty name
+    if not sanitized:
+        sanitized = 'tool'
+        
+    return sanitized
 
 def _convert_command_to_tool(
     command: click.Command, command_info: Dict[str, Any], name: str
@@ -111,7 +138,7 @@ def _convert_command_to_tool(
         input_schema["required"] = sorted(required_params)  # Sort for consistent output
 
     tool = types.Tool(
-        name=name,
+        name=_sanitize_tool_name(name),
         description=description,
         inputSchema=input_schema,
     )
