@@ -5,7 +5,7 @@ Simple test script to validate the context passing fix.
 
 import click
 from click_mcp.decorator import click_mcp
-from click_mcp.server import ClickMCPServer
+from click_mcp.server import MCPServer
 
 
 def test_context_passing_fix():
@@ -78,3 +78,4 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
