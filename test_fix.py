@@ -36,6 +36,10 @@ def test_context_passing_fix():
     tools = server.click_tools
     print(f"Available tools: {[tool.name for tool in tools]}")
     
+    # Debug: Print tool details
+    for tool in tools:
+        print(f"Tool: {tool.name}, Description: {tool.description}")
+    
     # Try to find and execute child command
     child_tool = None
     for tool in tools:
@@ -80,6 +84,7 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
 
 
 
