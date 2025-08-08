@@ -32,8 +32,8 @@ def test_context_passing_fix():
     # Create MCP server
     server = MCPServer(parent)
     
-    # Get available tools
-    tools = server.list_tools()
+    # Get available tools directly from the server's click_tools attribute
+    tools = server.click_tools
     print(f"Available tools: {[tool.name for tool in tools]}")
     
     # Try to find and execute child command
@@ -50,9 +50,9 @@ def test_context_passing_fix():
     print(f"Executing tool: {child_tool.name}")
     
     try:
-        # Execute child command via MCP
-        result = server.call_tool(child_tool.name, {})
-        output = result[0].text if result else "No output"
+        # Execute child command via MCP server's internal method
+        result = server._execute_command(child_tool.name, {})
+        output = result.get("output", "")
         print(f"Result: {output}")
         
         # Check if context passing worked
@@ -68,6 +68,8 @@ def test_context_passing_fix():
             
     except Exception as e:
         print(f"❌ Exception during execution: {e}")
+        import traceback
+        traceback.print_exc()
         return False
 
 
@@ -78,5 +80,6 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
 
 
