@@ -43,6 +43,10 @@ def test_context_passing_fix():
     # Create MCP server
     server = MCPServer(parent)
     
+    # Debug: Print the scanner's internal state
+    from click_mcp.scanner import _original_paths
+    print(f"Original paths mapping: {_original_paths}")
+    
     # Get available tools directly from the server's click_tools attribute
     tools = server.click_tools
     print(f"Available tools: {[tool.name for tool in tools]}")
@@ -99,6 +103,7 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
 
 
 
