@@ -28,6 +28,17 @@ def test_context_passing_fix():
             return "ERROR: ctx.obj is None"
         else:
             return f"SUCCESS: env={ctx.obj['env']}"
+    
+    # Debug: Print the CLI structure
+    print("CLI structure:")
+    print(f"Parent group: {parent.name}")
+    print(f"Parent commands: {list(parent.commands.keys())}")
+    
+    # Debug: Check if child command knows about its parent
+    child_cmd = parent.commands.get('child')
+    if child_cmd:
+        print(f"Child command: {child_cmd.name}")
+        print(f"Child parent: {getattr(child_cmd, 'parent', 'None')}")
 
     # Create MCP server
     server = MCPServer(parent)
@@ -88,6 +99,7 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
 
 
 
