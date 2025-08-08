@@ -100,21 +100,57 @@ class MCPServer:
         are properly passed to child commands, following the Group.invoke() pattern.
         
         Args:
-            path_segments: Command path like ['parent', 'child']
+            path_segments: Command path like ['parent', 'child'] or ['child'] for direct children
             args: Arguments for the final command
         """
         if not path_segments:
             return
 
-        # For single commands (no parent-child relationship), use simple execution
-        if len(path_segments) == 1:
-            command = self._find_command(self.cli_group, path_segments)
-            ctx = command.make_context(command.name, args)
-            with ctx:
-                command.invoke(ctx)
-            return
+        # Find the target command
+        command = self._find_command(self.cli_group, path_segments)
+        
+        # Check if this command is a direct child of a group that needs context setup
+        # In click-mcp, when a group is passed to MCPServer, it becomes the root,
+        # so child commands are direct children but may still need parent context
+        if len(path_segments) == 1 and isinstance(self.cli_group, click.Group):
+            # This is a direct child command of the root group
+            # We need to execute the root group first to set up context
+            self._execute_with_parent_context(self.cli_group, command, args)
+        else:
+            # For nested paths or non-group roots, use the hierarchical approach
+            self._execute_hierarchical_command_chain(path_segments, args)
 
-        # For nested commands, build the context chain
+    def _execute_with_parent_context(
+        self, parent_group: click.Group, child_command: click.Command, args: List[str]
+    ) -> None:
+        """
+        Execute a child command with proper parent group context.
+        
+        This handles the case where a child command needs its parent group
+        to execute first to set up the context (ctx.obj).
+        """
+        # Create parent context with empty args (parent groups typically use options)
+        parent_ctx = parent_group.make_context(parent_group.name or "cli", [])
+        
+        with parent_ctx:
+            # Execute parent group to set up context (this sets ctx.obj)
+            parent_group.invoke(parent_ctx)
+            
+            # Now create child context with parent context for inheritance
+            child_ctx = child_command.make_context(child_command.name, args, parent=parent_ctx)
+            
+            with child_ctx:
+                # Execute the child command
+                child_command.invoke(child_ctx)
+
+    def _execute_hierarchical_command_chain(
+        self, path_segments: List[str], args: List[str]
+    ) -> None:
+        """
+        Execute hierarchical command chain for nested command structures.
+        
+        This handles cases like ['parent', 'child', 'grandchild'].
+        """
         # Start with the root group
         current_group = self.cli_group
         parent_ctx = None
@@ -231,5 +267,6 @@ class MCPServer:
 
         # Otherwise, continue searching in the subgroup
         return self._find_command(cast(click.Group, cmd), remaining)
+
 
 
