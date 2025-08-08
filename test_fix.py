@@ -36,9 +36,11 @@ def test_context_passing_fix():
     tools = server.click_tools
     print(f"Available tools: {[tool.name for tool in tools]}")
     
-    # Debug: Print tool details
+    # Debug: Print tool details and original paths
+    from click_mcp.scanner import get_original_path
     for tool in tools:
-        print(f"Tool: {tool.name}, Description: {tool.description}")
+        original_path = get_original_path(tool.name)
+        print(f"Tool: {tool.name}, Original Path: {original_path}, Description: {tool.description}")
     
     # Try to find and execute child command
     child_tool = None
@@ -52,6 +54,8 @@ def test_context_passing_fix():
         return False
     
     print(f"Executing tool: {child_tool.name}")
+    original_path = get_original_path(child_tool.name)
+    print(f"Original path: {original_path}")
     
     try:
         # Execute child command via MCP server's internal method
@@ -84,6 +88,7 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
 
 
 
