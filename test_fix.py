@@ -30,7 +30,7 @@ def test_context_passing_fix():
             return f"SUCCESS: env={ctx.obj['env']}"
 
     # Create MCP server
-    server = ClickMCPServer(parent)
+    server = MCPServer(parent)
     
     # Get available tools
     tools = server.list_tools()
@@ -78,4 +78,5 @@ if __name__ == "__main__":
         print("\n🎉 Context passing fix validation successful!")
     else:
         print("\n💥 Context passing fix validation failed!")
+
 
