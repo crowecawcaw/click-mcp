@@ -15,6 +15,38 @@ _tool_positional_args: Dict[str, List[str]] = {}
 # Dictionary to store mapping between sanitized tool names and original paths
 _original_paths: Dict[str, str] = {}
 
+# Dictionary to store parent command information for hierarchical tools
+_parent_commands: Dict[str, click.Command] = {}
+
+# Dictionary to store child command names for hierarchical tools
+_child_command_names: Dict[str, str] = {}
+
+# Dictionary to store command path components for robust execution
+_command_path_components: Dict[str, List[str]] = {}
+
+# Dictionary to store child command references for hierarchical tools
+_child_commands: Dict[str, click.Command] = {}
+
+
+def get_parent_command(tool_name: str) -> Optional[click.Command]:
+    """Get the parent command for a hierarchical tool."""
+    return _parent_commands.get(tool_name)
+
+
+def get_child_command_name(tool_name: str) -> Optional[str]:
+    """Get the child command name for a hierarchical tool."""
+    return _child_command_names.get(tool_name)
+
+
+def get_command_path_components(tool_name: str) -> List[str]:
+    """Get the command path components for execution (e.g., ['users', 'list'])."""
+    return _command_path_components.get(tool_name, [tool_name])
+
+
+def get_child_command(tool_name: str) -> Optional[click.Command]:
+    """Get the child command reference for a hierarchical tool."""
+    return _child_commands.get(tool_name)
+
 
 def sanitize_tool_name(name: str) -> str:
     """
@@ -37,85 +69,180 @@ def get_original_path(sanitized_name: str) -> str:
     return _original_paths.get(sanitized_name, sanitized_name)
 
 
-def scan_click_command(command: click.Group, parent_path: str = "") -> List[types.Tool]:
+def scan_click_command(
+    command: click.Group, 
+    path_segments: List[str] = None,
+    parent_command: Optional[click.Command] = None
+) -> List[types.Tool]:
     """
     Scan a Click command and convert it to MCP tools.
 
     Args:
         command: A Click command or group.
-        parent_path: The parent path for nested commands.
+        path_segments: List of path segments (e.g., ['users', 'list']).
+        parent_command: The parent command for hierarchical tools.
 
     Returns:
         A list of MCP Tool objects.
     """
-    tools: List[types.Tool] = []
-    ctx = click.Context(command)
-    command_info = command.to_info_dict(ctx)
-
     if not isinstance(command, click.Group):
-        return tools
+        return []
 
-    for name, cmd_info in command_info.get("commands", {}).items():
-        # Skip excluded commands
-        metadata = get_mcp_metadata(name)
-        if metadata.get("include") is False:
+    if path_segments is None:
+        path_segments = []
+
+    tools = []
+    ctx = click.Context(command)
+    should_create_hierarchical = _should_create_hierarchical_tools(command, path_segments)
+
+    for name, cmd_info in command.to_info_dict(ctx).get("commands", {}).items():
+        if _should_skip_command(name, cmd_info):
             continue
 
-        # Determine command path
+        cmd = command.get_command(ctx, name)
+        if not cmd:
+            continue
+
+        # Skip MCP commands using attribute check (more robust than help text)
+        if getattr(cmd, '_is_mcp_command', False):
+            continue
+
+        # Get custom name from metadata
+        metadata = get_mcp_metadata(name)
         custom_name = metadata.get("name", name)
-        cmd_path = f"{parent_path}{custom_name}" if parent_path else custom_name
 
-        if "commands" in cmd_info:
-            # Handle subgroup
-            cmd = command.get_command(ctx, name)
-            if isinstance(cmd, click.Group):
-                group_name = metadata.get("name", name)
-                # Use underscore for path separator in sanitized paths
-                group_path = (
-                    f"{parent_path}{group_name}." if parent_path else f"{group_name}."
-                )
-                tools.extend(scan_click_command(cmd, group_path))
-        else:
-            # Handle command
-            cmd = command.get_command(ctx, name)
-            if cmd is not None:
-                # Sanitize the command path to conform to the regex pattern
-                sanitized_cmd_path = sanitize_tool_name(cmd_path)
-                # Store the mapping between sanitized name and original path
-                _original_paths[sanitized_cmd_path] = cmd_path
+        # Build current path
+        current_path = path_segments + [custom_name]
 
-                tool, positional_args = _convert_command_to_tool(
-                    cmd, cmd_info, sanitized_cmd_path
-                )
-                tools.append(tool)
-                # Store positional arguments in the global dictionary
-                if positional_args:
-                    _tool_positional_args[tool.name] = positional_args
+        tools.extend(_create_tools_for_command(
+            command, cmd, cmd_info, custom_name, 
+            should_create_hierarchical, current_path, parent_command
+        ))
 
     return tools
 
 
-def get_positional_args(tool_name: str) -> List[str]:
-    return _tool_positional_args.get(tool_name, [])
+def _should_create_hierarchical_tools(command: click.Group, path_segments: List[str]) -> bool:
+    """Check if this group should create hierarchical tools."""
+    is_root_group = len(path_segments) == 0
+    has_meaningful_params = any(param.name != "help" for param in command.params)
+    return is_root_group and has_meaningful_params
 
 
-def _convert_command_to_tool(
-    command: click.Command, command_info: Dict[str, Any], name: str
-) -> tuple[types.Tool, List[str]]:
+def _should_skip_command(name: str, cmd_info: Dict[str, Any] = None) -> bool:
+    """Check if a command should be skipped."""
+    metadata = get_mcp_metadata(name)
+    return metadata.get("include") is False
+
+
+
+def _create_tools_for_command(
+    parent_cmd: click.Group,
+    cmd: click.Command,
+    cmd_info: Dict[str, Any],
+    name: str,
+    should_create_hierarchical: bool,
+    current_path: List[str],
+    parent_command: Optional[click.Command] = None
+) -> List[types.Tool]:
     """
-    Convert a Click command to an MCP tool.
+    Create tools for a command based on its type and context.
+    
+    This function determines the appropriate tool creation strategy:
+    1. Subgroups: Recursively scan for nested commands
+    2. Hierarchical tools: Root-level commands that should include parent parameters
+    3. Regular tools: All other commands (nested or simple)
+    """
+    
+    if "commands" in cmd_info:
+        # This is a subgroup - recursively scan for nested commands
+        return scan_click_command(cmd, current_path, parent_cmd)
+    
+    elif should_create_hierarchical and len(current_path) == 1:
+        # This is a root-level command in a group that should create hierarchical tools
+        # Example: "child-a" in a parent group with meaningful parameters -> "parent_child_a"
+        tool_name = sanitize_tool_name("_".join([parent_cmd.name or "root"] + current_path))
+        original_path = current_path[0]  # Just the child command name for execution
+        return _create_tool(cmd, cmd_info, tool_name, original_path, parent_cmd, [original_path])
+    
+    else:
+        # This is a regular tool (nested or root-level)
+        # Examples: "greet" -> "greet", "users.list" -> "users_list"
+        tool_name = sanitize_tool_name("_".join(current_path))
+        original_path = ".".join(current_path)  # Full dotted path for execution
+        return _create_tool(cmd, cmd_info, tool_name, original_path, None, current_path)
 
+
+def _create_tool(
+    cmd: click.Command, 
+    cmd_info: Dict[str, Any], 
+    tool_name: str, 
+    original_path: str = None,
+    parent_cmd: Optional[click.Group] = None,
+    path_components: Optional[List[str]] = None
+) -> List[types.Tool]:
+    """
+    Create an MCP tool from a Click command with full metadata handling.
+    
+    This unified function:
+    1. Creates the MCP tool with proper schema (including parent parameters if hierarchical)
+    2. Stores all necessary metadata for command execution
+    3. Returns a list containing the single tool
+    
+    Args:
+        cmd: The Click command to create a tool for
+        cmd_info: Command info dictionary from Click
+        tool_name: The MCP-compliant tool name (should already be sanitized)
+        original_path: The original command path for execution (defaults to tool_name)
+        parent_cmd: Parent command for hierarchical tools (None for regular tools)
+        path_components: List of path components for robust execution (e.g., ['users', 'list'])
+        
     Returns:
-        A tuple of (Tool, positional_args_list)
+        List containing a single Tool object
     """
-    description = command_info.get("help") or command_info.get("short_help") or ""
+    # Default original_path to tool_name if not provided
+    if original_path is None:
+        original_path = tool_name
+    
+    # Store the original path mapping for command execution
+    _original_paths[tool_name] = original_path
+    
+    # Store path components for robust execution (eliminates need for path splitting)
+    if path_components:
+        _command_path_components[tool_name] = path_components
+    else:
+        # For hierarchical tools, path components are just the child command
+        # For simple tools, it's just the tool name
+        _command_path_components[tool_name] = [original_path]
+    
+    # Store parent command if this is a hierarchical tool
+    if parent_cmd is not None:
+        _parent_commands[tool_name] = parent_cmd
+        # For hierarchical tools, the original_path is the child command name
+        _child_command_names[tool_name] = original_path
+        # Store the actual child command reference for robust lookup
+        _child_commands[tool_name] = cmd
+    
+    # Build the tool description
+    description = cmd_info.get("help") or cmd_info.get("short_help") or ""
 
     properties: Dict[str, Dict[str, Any]] = {}
     required_params: List[str] = []
     positional_order: List[str] = []
 
-    # Process parameters
-    for param in command.params:
+    # First, add parent parameters if this is a hierarchical tool
+    if parent_cmd:
+        for param in parent_cmd.params:
+            param_name = param.name
+            if param_name:
+                param_data = _get_parameter_info(param)
+                if param_data:
+                    properties[param_name] = param_data
+                    if param_data.get("required", False):
+                        required_params.append(param_name)
+
+    # Then, add command parameters
+    for param in cmd.params:
         param_name = param.name
         if param_name:
             # Check if this is a positional argument (not an option)
@@ -127,7 +254,7 @@ def _convert_command_to_tool(
                 if param_data.get("required", False):
                     required_params.append(param_name)
 
-                # Track positional arguments in order
+                # Track positional arguments in order (only from the main command)
                 if is_positional:
                     positional_order.append(param_name)
 
@@ -139,13 +266,22 @@ def _convert_command_to_tool(
     if required_params:
         input_schema["required"] = sorted(required_params)  # Sort for consistent output
 
+    # Create the tool
     tool = types.Tool(
-        name=name,
+        name=tool_name,
         description=description,
         inputSchema=input_schema,
     )
+    
+    # Store positional argument order if any
+    if positional_order:
+        _tool_positional_args[tool.name] = positional_order
+    
+    return [tool]
 
-    return tool, positional_order
+
+def get_positional_args(tool_name: str) -> List[str]:
+    return _tool_positional_args.get(tool_name, [])
 
 
 def _get_parameter_info(param: click.Parameter) -> Optional[Dict[str, Any]]:
