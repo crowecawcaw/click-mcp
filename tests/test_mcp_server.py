@@ -71,7 +71,6 @@ async def test_basic_server_tools(basic_mcp_session):
     assert greet_tool.inputSchema["type"] == "object"
     assert "properties" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["properties"]
-    assert greet_tool.inputSchema["properties"]["name"]["required"] is True
     assert "required" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["required"]
 
@@ -345,7 +344,7 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     # Find the config_get command with positional argument
     config_get_tool = None
     for tool in tools:
-        if "config_get" in tool.name.lower():
+        if "config_get" in tool.name.lower() and tool.name.lower() == "config_get":
             config_get_tool = tool
             break
 
@@ -365,7 +364,7 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     assert len(result.content) > 0
     assert "Value for test-key: example_value" in result.content[0].text
 
-    # Find the config_get_value command with underscore in name
+    # Find the config_get_value command with dash in name
     config_get_value_tool = None
     for tool in tools:
         if "get_value" in tool.name.lower():
@@ -447,3 +446,43 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
     assert result is not None
     assert len(result.content) > 0
     assert result.content[0].text == "Hey World!"
+
+
+@pytest.mark.anyio
+async def test_mcp_command_excluded_from_tools(basic_mcp_session):
+    """Test that the MCP command itself is not exposed as a tool."""
+    # Get all available tools
+    result = await basic_mcp_session.list_tools()
+    tools = result.tools
+    tool_names = [tool.name for tool in tools]
+    
+    # Verify that the default 'mcp' command is NOT exposed as a tool
+    assert "mcp" not in tool_names, f"Default MCP command 'mcp' should not be exposed as a tool, but found in {tool_names}"
+    
+    # Verify that expected tools are present (sanity check)
+    expected_tools = ["echo", "greet", "users_list"]
+    for expected_tool in expected_tools:
+        assert expected_tool in tool_names, f"Expected tool '{expected_tool}' not found in {tool_names}"
+    
+    # Verify we have the expected number of tools (no extra MCP command)
+    assert len(tool_names) == len(expected_tools), f"Expected {len(expected_tools)} tools, but got {len(tool_names)}: {tool_names}"
+
+
+@pytest.mark.anyio 
+async def test_custom_mcp_command_excluded_from_tools(advanced_mcp_session):
+    """Test that custom MCP command names are also excluded from tool discovery."""
+    # Get all available tools from advanced CLI (which uses 'start-mcp' as MCP command)
+    result = await advanced_mcp_session.list_tools()
+    tools = result.tools
+    tool_names = [tool.name for tool in tools]
+    
+    # Verify that the custom 'start-mcp' command is NOT exposed as a tool
+    assert "start-mcp" not in tool_names, f"Custom MCP command 'start-mcp' should not be exposed as a tool, but found in {tool_names}"
+    
+    # Verify that the default 'mcp' command is also not there
+    assert "mcp" not in tool_names, f"Default MCP command 'mcp' should not be exposed as a tool, but found in {tool_names}"
+    
+    # Verify that expected tools are present (sanity check)
+    expected_tools = ["config_get", "config_get_value", "config_set", "copy", "greet", "process"]
+    for expected_tool in expected_tools:
+        assert expected_tool in tool_names, f"Expected tool '{expected_tool}' not found in {tool_names}"

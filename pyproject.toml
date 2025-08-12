@@ -27,6 +27,14 @@ dependencies = [
     "mcp>=0.1.0",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=6.0",
+    "pytest-cov",
+    "pytest-anyio",
+    "trio",
+]
+
 [project.urls]
 Homepage = "https://github.com/crowecawcaw/click-mcp"
 Issues = "https://github.com/crowecawcaw/click-mcp/issues"

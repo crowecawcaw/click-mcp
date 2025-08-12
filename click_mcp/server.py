@@ -13,7 +13,7 @@ from mcp.server import stdio
 from mcp.server.lowlevel import Server
 
 from .decorator import get_mcp_metadata
-from .scanner import get_positional_args, scan_click_command
+from .scanner import get_positional_args, get_parent_command, get_child_command_name, get_command_path_components, get_child_command, scan_click_command
 
 
 class MCPServer:
@@ -68,95 +68,104 @@ class MCPServer:
     def _execute_command(
         self, tool_name: str, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Execute a Click command and return its output."""
-        # Get the original command path
-        from .scanner import get_original_path
+        command_args = self._prepare_command_arguments(tool_name, parameters)
+        return self._run_click_command(command_args)
 
-        original_path = get_original_path(tool_name)
-        command = self._find_command(self.cli_group, original_path.split("."))
-        args = self._build_command_args(command, tool_name, parameters)
-
-        # Capture and return command output
+    def _prepare_command_arguments(self, tool_name: str, parameters: Dict[str, Any]) -> List[str]:
+        if get_parent_command(tool_name) is not None:
+            return self._prepare_hierarchical_arguments(tool_name, parameters)
+        else:
+            return self._prepare_simple_arguments(tool_name, parameters)
+    
+    def _prepare_hierarchical_arguments(self, tool_name: str, parameters: Dict[str, Any]) -> List[str]:
+        args: List[str] = []
+        
+        parent_cmd = get_parent_command(tool_name)
+        child_name = get_child_command_name(tool_name)
+        child_cmd = get_child_command(tool_name)
+        
+        if not parent_cmd or not child_name or not child_cmd:
+            return args
+        
+        child_cli_name = child_name.replace("_", "-")
+        
+        parent_param_names = {param.name for param in parent_cmd.params}
+        parent_parameters = {k: v for k, v in parameters.items() if k in parent_param_names}
+        
+        parent_args = self._convert_parameters_to_args(parent_parameters, [], parent_cmd.params)
+        args.extend(parent_args)
+        
+        args.append(child_cli_name)
+        
+        child_param_names = {param.name for param in child_cmd.params}
+        child_parameters = {k: v for k, v in parameters.items() if k in child_param_names}
+        
+        positional_order = get_positional_args(tool_name)
+        child_args = self._convert_parameters_to_args(child_parameters, positional_order, child_cmd.params)
+        args.extend(child_args)
+        
+        return args
+    
+    def _prepare_simple_arguments(self, tool_name: str, parameters: Dict[str, Any]) -> List[str]:
+        path_components = get_command_path_components(tool_name)
+        parameter_args = self._convert_parameters_to_args(
+            parameters, 
+            get_positional_args(tool_name)
+        )
+        return path_components + parameter_args
+    
+    def _run_click_command(self, args: List[str]) -> Dict[str, Any]:
+        """Execute the Click command with prepared arguments."""
         output = io.StringIO()
         with contextlib.redirect_stdout(output):
             try:
-                ctx = command.make_context(command.name, args)
-                command.invoke(ctx)
+                # Use Click's main() method which handles parent-child execution naturally
+                self.cli_group.main(args=args, standalone_mode=False)
             except Exception as e:
                 raise ValueError(f"Command execution failed: {str(e)}") from e
-
+        
         return {"output": output.getvalue().rstrip()}
 
-    def _build_command_args(
-        self, command: click.Command, tool_name: str, parameters: Dict[str, Any]
+    def _convert_parameters_to_args(
+        self, 
+        parameters: Dict[str, Any], 
+        positional_order: List[str],
+        param_definitions: Optional[List[click.Parameter]] = None
     ) -> List[str]:
-        """Build command arguments from parameters."""
-        args: List[str] = []
-
-        # Get positional arguments for this tool
-        positional_order = get_positional_args(tool_name)
-
-        # First, handle positional arguments in the correct order
+        """Convert parameters to CLI arguments."""
+        args = []
+        
+        # Add positional arguments in order
         for param_name in positional_order:
             if param_name in parameters:
                 args.append(str(parameters[param_name]))
-
-        # Then handle options (non-positional parameters)
-        for name, value in parameters.items():
-            if name not in positional_order:  # Skip positional args already processed
-                # Handle boolean flags
-                if isinstance(value, bool):
-                    if value:
-                        args.append(f"--{name}")
-                else:
-                    args.append(f"--{name}")
-                    args.append(str(value))
-
+        
+        # Add options
+        if param_definitions:
+            # Use Click parameter definitions for accurate type handling
+            for param in param_definitions:
+                param_name = param.name
+                if param_name in parameters and param_name not in positional_order:
+                    value = parameters[param_name]
+                    if isinstance(param, click.Option):
+                        self._add_option_arg(args, param_name, value, 
+                                           is_bool=isinstance(param.type, click.types.BoolParamType))
+        else:
+            # Fallback to simple type detection
+            for name, value in parameters.items():
+                if name not in positional_order:
+                    self._add_option_arg(args, name, value, is_bool=isinstance(value, bool))
+        
         return args
 
-    def _find_command(self, group: click.Group, path: List[str]) -> click.Command:
-        """Find a command in a group by path."""
-        if not path:
-            return group
-
-        # Handle the case where the first element is the group name itself
-        if path[0] == group.name:
-            return self._find_command(group, path[1:])
-
-        current, *remaining = path
-
-        # Try to find the command by name
-        if current in group.commands:
-            cmd = group.commands[current]
+    def _add_option_arg(self, args: List[str], param_name: str, value: Any, is_bool: bool) -> None:
+        """Add an option argument to the args list."""
+        if is_bool:
+            if value:
+                args.append(f"--{param_name.replace('_', '-')}")
         else:
-            # Try to find a command with a custom name
-            cmd = None
-            for cmd_name, command in group.commands.items():
-                # Check command metadata
-                if get_mcp_metadata(cmd_name).get("name") == current:
-                    cmd = command
-                    break
+            args.extend([f"--{param_name.replace('_', '-')}", str(value)])
 
-                # Check callback metadata
-                if (
-                    hasattr(command, "callback")
-                    and command.callback is not None
-                    and hasattr(command.callback, "_mcp_metadata")
-                    and command.callback._mcp_metadata.get("name") == current
-                ):
-                    cmd = command
-                    break
 
-            if cmd is None:
-                raise ValueError(f"Command not found: {current}")
 
-        # If there are more path segments, the command must be a group
-        if remaining and not hasattr(cmd, "commands"):
-            raise ValueError(f"'{current}' is not a command group")
 
-        # If this is the last segment, return the command
-        if not remaining:
-            return cast(click.Command, cmd)
-
-        # Otherwise, continue searching in the subgroup
-        return self._find_command(cast(click.Group, cmd), remaining)

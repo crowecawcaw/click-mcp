@@ -85,4 +85,7 @@ def _add_mcp_command(
         server = MCPServer(cli_group, server_name)
         server.run()
 
+    # Mark this command as an MCP command for robust detection
+    mcp_command._is_mcp_command = True
+
     return cli_group
