@@ -68,44 +68,35 @@ class MCPServer:
     def _execute_command(
         self, tool_name: str, parameters: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Execute a Click command using Click's native main() method."""
         command_args = self._prepare_command_arguments(tool_name, parameters)
         return self._run_click_command(command_args)
 
     def _prepare_command_arguments(self, tool_name: str, parameters: Dict[str, Any]) -> List[str]:
-        """Prepare command line arguments based on tool type."""
         if get_parent_command(tool_name) is not None:
             return self._prepare_hierarchical_arguments(tool_name, parameters)
         else:
             return self._prepare_simple_arguments(tool_name, parameters)
     
     def _prepare_hierarchical_arguments(self, tool_name: str, parameters: Dict[str, Any]) -> List[str]:
-        """Prepare arguments for hierarchical tools (parent command + child command)."""
         args: List[str] = []
         
-        # Get parent command and child command name - no string parsing needed!
         parent_cmd = get_parent_command(tool_name)
         child_name = get_child_command_name(tool_name)
         child_cmd = get_child_command(tool_name)
         
         if not parent_cmd or not child_name or not child_cmd:
-            return args  # Should not happen since we check this before calling
+            return args
         
-        # Convert child name to CLI format (underscores to dashes)
         child_cli_name = child_name.replace("_", "-")
         
-        # Filter parameters to only include parent parameters
         parent_param_names = {param.name for param in parent_cmd.params}
         parent_parameters = {k: v for k, v in parameters.items() if k in parent_param_names}
         
-        # Add parent parameters first
         parent_args = self._convert_parameters_to_args(parent_parameters, [], parent_cmd.params)
         args.extend(parent_args)
         
-        # Add child command name
         args.append(child_cli_name)
         
-        # Add child parameters using stored command reference (no string matching!)
         child_param_names = {param.name for param in child_cmd.params}
         child_parameters = {k: v for k, v in parameters.items() if k in child_param_names}
         
@@ -116,8 +107,6 @@ class MCPServer:
         return args
     
     def _prepare_simple_arguments(self, tool_name: str, parameters: Dict[str, Any]) -> List[str]:
-        """Prepare arguments for simple tools (direct command execution)."""
-        # Use stored path components instead of parsing dotted paths
         path_components = get_command_path_components(tool_name)
         parameter_args = self._convert_parameters_to_args(
             parameters, 
