@@ -71,7 +71,6 @@ async def test_basic_server_tools(basic_mcp_session):
     assert greet_tool.inputSchema["type"] == "object"
     assert "properties" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["properties"]
-    assert greet_tool.inputSchema["properties"]["name"]["required"] is True
     assert "required" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["required"]
 

@@ -201,7 +201,8 @@ def _create_tool(
                 param_data = _get_parameter_info(param)
                 if param_data:
                     properties[param_name] = param_data
-                    if param_data.get("required", False):
+                    # Check if parameter is required directly from Click parameter
+                    if getattr(param, "required", False):
                         required_params.append(param_name)
 
     # Then, add command parameters
@@ -214,7 +215,8 @@ def _create_tool(
             param_data = _get_parameter_info(param)
             if param_data:
                 properties[param_name] = param_data
-                if param_data.get("required", False):
+                # Check if parameter is required directly from Click parameter
+                if getattr(param, "required", False):
                     required_params.append(param_name)
 
                 # Track positional arguments in order (only from the main command)
@@ -274,11 +276,6 @@ def _get_parameter_info(param: click.Parameter) -> Optional[Dict[str, Any]]:
         "description": getattr(param, "help", ""),
         "schema": schema,
     }
-
-    # Add 'required' flag separately for collecting at the top level
-    is_required = getattr(param, "required", False)
-    if is_required:
-        param_data["required"] = True  # Keep track for the loop above
 
     # Add default if available and not callable
     default = getattr(param, "default", None)
