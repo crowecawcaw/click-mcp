@@ -263,19 +263,21 @@ def _get_parameter_info(param: click.Parameter) -> Optional[Dict[str, Any]]:
     elif isinstance(param.type, click.types.BoolParamType):
         param_type = "boolean"
 
-    # Create schema object
-    schema: Dict[str, Any] = {"type": param_type}
+    # Create parameter info (this represents the schema for a single property)
+    # According to JSON Schema draft 2020-12, properties should have type directly
+    param_data: Dict[str, Any] = {
+        "type": param_type,
+    }
+
+    # Add description if available
+    help_text = getattr(param, "help", "")
+    if help_text:
+        param_data["description"] = help_text
 
     # Handle choices if present
     if hasattr(param, "choices") and param.choices is not None:
         if isinstance(param.choices, (list, tuple)):
-            schema["enum"] = list(param.choices)
-
-    # Create parameter info (this represents the schema for a single property)
-    param_data = {
-        "description": getattr(param, "help", ""),
-        "schema": schema,
-    }
+            param_data["enum"] = list(param.choices)
 
     # Add default if available and not callable
     default = getattr(param, "default", None)
