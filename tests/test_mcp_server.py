@@ -103,7 +103,7 @@ async def test_basic_server_tools(basic_mcp_session):
     assert echo_tool.inputSchema["type"] == "object"
     assert "properties" in echo_tool.inputSchema
     assert "count" in echo_tool.inputSchema["properties"]
-    assert echo_tool.inputSchema["properties"]["count"]["schema"]["type"] == "integer"
+    assert echo_tool.inputSchema["properties"]["count"]["type"] == "integer"
     assert "message" in echo_tool.inputSchema["properties"]
     assert "required" in echo_tool.inputSchema
     assert "message" in echo_tool.inputSchema["required"]  # Only message is required
@@ -273,7 +273,7 @@ async def test_advanced_server_tools(advanced_mcp_session):
     assert "properties" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["properties"]
     assert "formal" in greet_tool.inputSchema["properties"]
-    assert greet_tool.inputSchema["properties"]["formal"]["schema"]["type"] == "boolean"
+    assert greet_tool.inputSchema["properties"]["formal"]["type"] == "boolean"
     assert "required" in greet_tool.inputSchema
     assert "name" in greet_tool.inputSchema["required"]  # Only name is required
 
