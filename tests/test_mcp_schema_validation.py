@@ -11,6 +11,7 @@ from typing import List
 
 import click
 import jsonschema
+from jsonschema import Draft202012Validator
 import pytest
 from mcp import types
 
@@ -25,6 +26,23 @@ with open(SCHEMA_PATH) as f:
 # Create a validator for Tool objects
 TOOL_SCHEMA = MCP_SCHEMA["definitions"]["Tool"]
 
+# JSON Schema draft 2020-12 meta-schema for validating inputSchema
+# This ensures the inputSchema itself is a valid JSON Schema
+JSON_SCHEMA_DRAFT_2020_12_META_SCHEMA = {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://json-schema.org/draft/2020-12/schema",
+    "$vocabulary": {
+        "https://json-schema.org/draft/2020-12/vocab/core": True,
+        "https://json-schema.org/draft/2020-12/vocab/applicator": True,
+        "https://json-schema.org/draft/2020-12/vocab/unevaluated": True,
+        "https://json-schema.org/draft/2020-12/vocab/validation": True,
+        "https://json-schema.org/draft/2020-12/vocab/meta-data": True,
+        "https://json-schema.org/draft/2020-12/vocab/format-annotation": True,
+        "https://json-schema.org/draft/2020-12/vocab/content": True
+    },
+    "type": ["object", "boolean"]
+}
+
 
 def validate_tool_against_schema(tool: types.Tool) -> None:
     """Validate a Tool object against the official MCP schema."""
@@ -35,7 +53,7 @@ def validate_tool_against_schema(tool: types.Tool) -> None:
         "inputSchema": tool.inputSchema,
     }
 
-    # Validate against the schema
+    # Validate against the MCP schema
     jsonschema.validate(
         instance=tool_dict,
         schema=TOOL_SCHEMA,
@@ -44,6 +62,38 @@ def validate_tool_against_schema(tool: types.Tool) -> None:
             referrer=MCP_SCHEMA,
         ),
     )
+
+
+def validate_input_schema_is_valid_json_schema(input_schema: dict) -> None:
+    """
+    Validate that an inputSchema is a valid JSON Schema draft 2020-12.
+
+    The MCP schema only checks basic structure, but doesn't validate that
+    the inputSchema itself is a valid JSON Schema. This function performs
+    that deeper validation.
+    """
+    # Use Draft202012Validator to check the schema
+    validator = Draft202012Validator
+
+    # Check the schema is valid according to JSON Schema draft 2020-12
+    validator.check_schema(input_schema)
+
+    # Additional checks specific to MCP requirements
+    assert input_schema.get("type") == "object", "inputSchema type must be 'object'"
+
+    # Validate that properties, if present, are valid
+    if "properties" in input_schema:
+        properties = input_schema["properties"]
+        assert isinstance(properties, dict), "properties must be a dict"
+
+        for prop_name, prop_schema in properties.items():
+            assert isinstance(prop_schema, dict), f"Property '{prop_name}' must be a dict"
+
+            # Each property must have a type (per JSON Schema draft 2020-12 and the previous PR fix)
+            assert "type" in prop_schema, f"Property '{prop_name}' must have a 'type' field"
+
+            # Validate the property schema itself is valid JSON Schema
+            validator.check_schema(prop_schema)
 
 
 class TestBasicCLISchemaValidation:
@@ -362,3 +412,178 @@ class TestSchemaEdgeCases:
                     default = prop_schema["default"]
                     assert not (hasattr(default, "__class__") and
                               "Sentinel" in default.__class__.__name__)
+
+
+class TestInputSchemaJSONSchemaCompliance:
+    """Test that inputSchema fields are valid JSON Schema draft 2020-12."""
+
+    def test_all_input_schemas_are_valid_json_schemas(self):
+        """Test that all inputSchema fields are valid JSON Schema draft 2020-12."""
+        @click.group()
+        def cli():
+            pass
+
+        @cli.command()
+        @click.option("--name", required=True, help="Name parameter")
+        @click.option("--count", type=int, default=1, help="Count parameter")
+        @click.option("--verbose", is_flag=True, help="Verbose flag")
+        def test_cmd(name, count, verbose):
+            """Test command."""
+            pass
+
+        tools = scan_click_command(cli)
+
+        for tool in tools:
+            # This will raise an exception if the schema is invalid
+            validate_input_schema_is_valid_json_schema(tool.inputSchema)
+
+    def test_input_schema_has_required_type_field(self):
+        """Test that inputSchema has type='object' as required by MCP."""
+        @click.group()
+        def cli():
+            pass
+
+        @cli.command()
+        @click.option("--param", help="A parameter")
+        def cmd(param):
+            """Command."""
+            pass
+
+        tools = scan_click_command(cli)
+
+        for tool in tools:
+            assert tool.inputSchema["type"] == "object"
+            validate_input_schema_is_valid_json_schema(tool.inputSchema)
+
+    def test_properties_have_type_field(self):
+        """Test that all properties have a 'type' field (per JSON Schema draft 2020-12)."""
+        @click.group()
+        def cli():
+            pass
+
+        @cli.command()
+        @click.option("--str-param", help="String parameter")
+        @click.option("--int-param", type=int, help="Integer parameter")
+        @click.option("--bool-param", is_flag=True, help="Boolean parameter")
+        def cmd(str_param, int_param, bool_param):
+            """Command with various parameter types."""
+            pass
+
+        tools = scan_click_command(cli)
+
+        for tool in tools:
+            validate_input_schema_is_valid_json_schema(tool.inputSchema)
+
+            properties = tool.inputSchema.get("properties", {})
+            for prop_name, prop_schema in properties.items():
+                # Each property must have a type
+                assert "type" in prop_schema, f"Property '{prop_name}' missing 'type' field"
+
+                # Type must be a valid JSON Schema type
+                valid_types = ["string", "integer", "number", "boolean", "array", "object", "null"]
+                assert prop_schema["type"] in valid_types
+
+    def test_enum_properties_are_valid_json_schema(self):
+        """Test that enum properties are valid JSON Schema."""
+        @click.group()
+        def cli():
+            pass
+
+        @cli.command()
+        @click.option("--level", type=click.Choice(["debug", "info", "warning", "error"]))
+        def cmd(level):
+            """Command with choice parameter."""
+            pass
+
+        tools = scan_click_command(cli)
+
+        for tool in tools:
+            validate_input_schema_is_valid_json_schema(tool.inputSchema)
+
+            properties = tool.inputSchema.get("properties", {})
+            if "level" in properties:
+                level_schema = properties["level"]
+                # Should have both type and enum
+                assert "type" in level_schema
+                assert "enum" in level_schema
+                assert isinstance(level_schema["enum"], list)
+
+    def test_required_array_is_valid(self):
+        """Test that the 'required' array contains valid property names."""
+        @click.group()
+        def cli():
+            pass
+
+        @cli.command()
+        @click.option("--required-param", required=True, help="Required parameter")
+        @click.option("--optional-param", help="Optional parameter")
+        def cmd(required_param, optional_param):
+            """Command with required and optional parameters."""
+            pass
+
+        tools = scan_click_command(cli)
+
+        for tool in tools:
+            validate_input_schema_is_valid_json_schema(tool.inputSchema)
+
+            if "required" in tool.inputSchema:
+                required = tool.inputSchema["required"]
+                properties = tool.inputSchema.get("properties", {})
+
+                # All required fields must be in properties
+                for req_field in required:
+                    assert req_field in properties, f"Required field '{req_field}' not in properties"
+
+    def test_real_fixtures_have_valid_json_schemas(self):
+        """Test that all real CLI fixtures produce valid JSON Schema inputSchemas."""
+        from tests.basic_cli import cli as basic_cli
+        from tests.advanced_cli import cli as advanced_cli
+        from tests.context_cli import parent as context_cli
+
+        for cli, name in [(basic_cli, "basic_cli"), (advanced_cli, "advanced_cli"), (context_cli, "context_cli")]:
+            tools = scan_click_command(cli)
+
+            for tool in tools:
+                # Validate against MCP schema
+                validate_tool_against_schema(tool)
+
+                # Validate that inputSchema is valid JSON Schema
+                try:
+                    validate_input_schema_is_valid_json_schema(tool.inputSchema)
+                except Exception as e:
+                    pytest.fail(f"Tool '{tool.name}' from {name} has invalid inputSchema: {e}")
+
+    def test_default_values_are_json_schema_compatible(self):
+        """Test that default values are compatible with JSON Schema."""
+        @click.group()
+        def cli():
+            pass
+
+        @cli.command()
+        @click.option("--str-default", default="hello", help="String with default")
+        @click.option("--int-default", type=int, default=42, help="Integer with default")
+        @click.option("--bool-default", is_flag=True, help="Boolean flag")
+        def cmd(str_default, int_default, bool_default):
+            """Command with defaults."""
+            pass
+
+        tools = scan_click_command(cli)
+
+        for tool in tools:
+            validate_input_schema_is_valid_json_schema(tool.inputSchema)
+
+            properties = tool.inputSchema.get("properties", {})
+            for prop_name, prop_schema in properties.items():
+                if "default" in prop_schema:
+                    default_value = prop_schema["default"]
+                    prop_type = prop_schema["type"]
+
+                    # Validate type consistency
+                    if prop_type == "string":
+                        assert isinstance(default_value, str)
+                    elif prop_type == "integer":
+                        assert isinstance(default_value, int) and not isinstance(default_value, bool)
+                    elif prop_type == "number":
+                        assert isinstance(default_value, (int, float)) and not isinstance(default_value, bool)
+                    elif prop_type == "boolean":
+                        assert isinstance(default_value, bool)
