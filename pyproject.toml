@@ -32,7 +32,9 @@ test = [
     "pytest>=6.0",
     "pytest-cov",
     "pytest-anyio",
+    "pytest-timeout",
     "trio",
+    "jsonschema>=4.0",
 ]
 
 [project.urls]
