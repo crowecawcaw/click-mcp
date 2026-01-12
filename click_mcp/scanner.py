@@ -274,14 +274,17 @@ def _get_parameter_info(param: click.Parameter) -> Optional[Dict[str, Any]]:
     if help_text:
         param_data["description"] = help_text
 
-    # Handle choices if present
-    if hasattr(param, "choices") and param.choices is not None:
-        if isinstance(param.choices, (list, tuple)):
-            param_data["enum"] = list(param.choices)
+    # Handle choices if present (for click.Choice type)
+    if hasattr(param.type, "choices") and param.type.choices is not None:
+        if isinstance(param.type.choices, (list, tuple)):
+            param_data["enum"] = list(param.type.choices)
 
     # Add default if available and not callable
+    # Filter out Click's Sentinel.UNSET and other non-JSON-serializable defaults
     default = getattr(param, "default", None)
     if default is not None and not callable(default):
-        param_data["default"] = default
+        # Only include JSON-serializable defaults (str, int, float, bool, list, dict, None)
+        if isinstance(default, (str, int, float, bool, list, dict, type(None))):
+            param_data["default"] = default
 
     return param_data
