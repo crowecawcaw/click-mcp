@@ -25,6 +25,8 @@ class MCPServer:
         cli_group: click.Group,
         server_name: str = "click-mcp",
         include_all_commands: bool = True,
+        *,
+        include_hidden: bool = False,
     ):
         """
         Initialize the MCP server.
@@ -33,10 +35,13 @@ class MCPServer:
             cli_group: A Click group to expose as MCP tools.
             server_name: The name of the MCP server.
             include_all_commands: Expose commands by default.
+            include_hidden: Whether hidden commands and groups can be exposed.
         """
         self.cli_group = cli_group
         self.server_name = server_name
-        self.routes = scan_tool_routes(cli_group, include_all_commands)
+        self.routes = scan_tool_routes(
+            cli_group, include_all_commands, include_hidden=include_hidden
+        )
         self.click_tools = [route.tool for route in self.routes.values()]
         self.tool_map = {tool.name: tool for tool in self.click_tools}
         self.server: Server[dict[str, Any]] = Server(

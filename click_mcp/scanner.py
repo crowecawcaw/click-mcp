@@ -40,9 +40,11 @@ def get_original_path(sanitized_name: str) -> str:
     return _original_paths.get(sanitized_name, sanitized_name)
 
 
-def scan_click_command(command: click.Group) -> list[types.Tool]:
+def scan_click_command(
+    command: click.Group, *, include_hidden: bool = False
+) -> list[types.Tool]:
     """Scan a Click group and return the exposed MCP tools."""
-    routes = scan_tool_routes(command)
+    routes = scan_tool_routes(command, include_hidden=include_hidden)
     _original_paths.update(
         (name, ".".join(route.path)) for name, route in routes.items()
     )
@@ -50,7 +52,10 @@ def scan_click_command(command: click.Group) -> list[types.Tool]:
 
 
 def scan_tool_routes(
-    command: click.Group, include_all_commands: bool = True
+    command: click.Group,
+    include_all_commands: bool = True,
+    *,
+    include_hidden: bool = False,
 ) -> dict[str, ToolRoute]:
     """Build a tool table with the Click path and parameters for each tool."""
     routes: dict[str, ToolRoute] = {}
@@ -70,11 +75,16 @@ def scan_tool_routes(
                 if not cmd or getattr(cmd, "_is_mcp_command", False):
                     continue
 
-                metadata = get_mcp_metadata(name)
-                if metadata.get("include") is False:
+                if cmd.hidden and not include_hidden:
                     continue
 
                 command_path = (*path, name)
+                metadata = get_mcp_metadata(".".join(command_path))
+                if not metadata:
+                    metadata = get_mcp_metadata(name)
+                if metadata.get("include") is False:
+                    continue
+
                 names = (*tool_path, metadata.get("name", name))
                 command_chain = (*commands, cmd)
                 if isinstance(cmd, click.Group):
@@ -92,7 +102,7 @@ def scan_tool_routes(
                     raise ValueError(
                         f"Commands {previous!r} and {current!r} both map to {tool_name!r}"
                     )
-                tool = _create_tool(tool_name, cmd, command_chain)
+                tool = _create_tool(tool_name, cmd, command_chain, metadata)
                 routes[tool_name] = ToolRoute(tool, command_path, command_chain)
 
     scan_group(command, (), (), (command,))
@@ -100,7 +110,10 @@ def scan_tool_routes(
 
 
 def _create_tool(
-    tool_name: str, cmd: click.Command, commands: tuple[click.Command, ...]
+    tool_name: str,
+    cmd: click.Command,
+    commands: tuple[click.Command, ...],
+    metadata: dict[str, Any],
 ) -> types.Tool:
     properties: dict[str, dict[str, Any]] = {}
     required: set[str] = set()
@@ -119,6 +132,7 @@ def _create_tool(
         name=tool_name,
         description=cmd.help or cmd.short_help or "",
         input_schema=input_schema,
+        annotations=metadata.get("annotations"),
     )
 
 
