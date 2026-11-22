@@ -4,11 +4,13 @@ Scanner for Click commands to convert them to MCP tools.
 
 import re
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 import click
 import mcp.types as types
 
+from .compat import is_exposed_parameter, is_group, parameter_type
 from .decorator import get_mcp_metadata
 
 _original_paths: dict[str, str] = {}
@@ -59,7 +61,9 @@ def scan_tool_routes(
 ) -> dict[str, ToolRoute]:
     """Build a tool table with the Click path and parameters for each tool."""
     routes: dict[str, ToolRoute] = {}
-    root_has_params = any(param.name != "help" for param in command.params)
+    root_has_params = any(
+        param.name != "help" and is_exposed_parameter(param) for param in command.params
+    )
 
     def scan_group(
         group: click.Group,
@@ -87,8 +91,8 @@ def scan_tool_routes(
 
                 names = (*tool_path, metadata.get("name", name))
                 command_chain = (*commands, cmd)
-                if isinstance(cmd, click.Group):
-                    scan_group(cmd, command_path, names, command_chain, ctx)
+                if is_group(cmd):
+                    scan_group(cmd, command_path, names, command_chain, ctx)  # type: ignore[arg-type]
                     continue
                 if not metadata.get("include", include_all_commands):
                     continue
@@ -138,37 +142,21 @@ def _create_tool(
 
 def _get_parameter_info(param: click.Parameter) -> dict[str, Any] | None:
     """Extract parameter information from a Click parameter."""
-    if getattr(param, "hidden", False) or not param.name:
+    if not is_exposed_parameter(param) or not param.name:
         return None
 
-    # Determine parameter type
-    param_type = "string"  # Default type
-    if isinstance(param.type, click.types.IntParamType):
-        param_type = "integer"
-    elif isinstance(param.type, click.types.FloatParamType):
-        param_type = "number"
-    elif isinstance(param.type, click.types.BoolParamType):
-        param_type = "boolean"
-
-    # Create parameter info (this represents the schema for a single property)
-    # According to JSON Schema draft 2020-12, properties should have type directly
-    param_data: dict[str, Any] = {
-        "type": param_type,
-    }
-
-    # Add description if available
-    help_text = getattr(param, "help", "")
-    if help_text:
+    schema_type, choices = parameter_type(param)
+    param_data: dict[str, Any] = {"type": schema_type}
+    if help_text := getattr(param, "help", None):
         param_data["description"] = help_text
-
-    # Handle choices if present (for click.Choice type)
-    if hasattr(param.type, "choices") and param.type.choices is not None:
-        if isinstance(param.type.choices, (list, tuple)):
-            param_data["enum"] = list(param.type.choices)
+    if choices is not None:
+        param_data["enum"] = choices
 
     # Add default if available and not callable
     # Filter out Click's Sentinel.UNSET and other non-JSON-serializable defaults
     default = getattr(param, "default", None)
+    if isinstance(default, Enum) and getattr(param, "type_descriptor", None):
+        default = str(default.value)
     if default is not None and not callable(default):
         # Only include JSON-serializable defaults (str, int, float, bool, list, dict, None)
         if isinstance(default, (str, int, float, bool, list, dict, type(None))):
