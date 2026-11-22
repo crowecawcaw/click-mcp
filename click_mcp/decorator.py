@@ -17,7 +17,7 @@ def register_mcp_metadata(command_name: str, metadata: Dict[str, Any]) -> None:
     Register MCP metadata for a command.
 
     Args:
-        command_name: The name of the command.
+        command_name: The CLI path relative to the root, such as users.list, or a legacy leaf name.
         metadata: The metadata to register.
     """
     _MCP_REGISTRY[command_name] = metadata
@@ -28,7 +28,7 @@ def get_mcp_metadata(command_name: str) -> Dict[str, Any]:
     Get MCP metadata for a command.
 
     Args:
-        command_name: The name of the command.
+        command_name: The CLI path relative to the root, such as users.list, or a legacy leaf name.
 
     Returns:
         The metadata for the command, or an empty dict if none exists.
@@ -41,6 +41,8 @@ def click_mcp(
     cli_group: Optional[click.Group] = None,
     command_name: str = "mcp",
     include_all_commands: bool = True,
+    *,
+    include_hidden: bool = False,
 ) -> Union[Callable[[click.Group], click.Group], click.Group]:
     """
     Decorator that adds MCP support to a Click application.
@@ -50,7 +52,8 @@ def click_mcp(
             to be used as @click_mcp.
         command_name: The name of the MCP command to add.
         server_name: The name of the MCP server to use. Required.
-        include_all_commands: Whether to include all commands by default.
+        include_all_commands: Whether to include commands by default.
+        include_hidden: Whether hidden commands and groups can be exposed.
 
     Returns:
         The decorated Click group.
@@ -60,12 +63,14 @@ def click_mcp(
     # Handle case where decorator is used without arguments
     if cli_group is not None:
         return _add_mcp_command(
-            cli_group, command_name, server_name, include_all_commands
+            cli_group, command_name, server_name, include_all_commands, include_hidden
         )
 
     # Handle case where decorator is used with arguments
     def decorator(group: click.Group) -> click.Group:
-        return _add_mcp_command(group, command_name, server_name, include_all_commands)
+        return _add_mcp_command(
+            group, command_name, server_name, include_all_commands, include_hidden
+        )
 
     return decorator
 
@@ -75,6 +80,7 @@ def _add_mcp_command(
     command_name: str,
     server_name: str,
     include_all_commands: bool,
+    include_hidden: bool,
 ) -> click.Group:
     """Add an MCP command to a Click group."""
     from .server import MCPServer
@@ -82,7 +88,9 @@ def _add_mcp_command(
     @cli_group.command(name=command_name)
     def mcp_command() -> None:
         """Start the MCP server for this CLI application."""
-        server = MCPServer(cli_group, server_name, include_all_commands)
+        server = MCPServer(
+            cli_group, server_name, include_all_commands, include_hidden=include_hidden
+        )
         server.run()
 
     # Mark this command as an MCP command for robust detection

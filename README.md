@@ -117,7 +117,7 @@ This can be useful when:
 
 ### Working with Nested Command Groups
 
-`click-mcp` supports nested command groups. When you have a complex CLI structure with subcommands, all commands are exposed as MCP tools:
+`click-mcp` supports nested command groups. When you have a complex CLI structure with subcommands, visible leaf commands are exposed as MCP tools by default:
 
 ```python
 @click_mcp(server_name="my-cli-app")
@@ -145,6 +145,37 @@ def delete(username):
 ```
 
 When exposed as MCP tools, the nested commands will be available with their full path using underscores (e.g., `users_create` and `users_delete`).
+
+### Exposing only selected commands
+
+For an inventory CLI with `projects list`, `projects delete`, and an internal
+`admin` group, register the read-only command and turn off automatic exposure:
+
+```python
+from click_mcp import click_mcp
+from click_mcp.decorator import register_mcp_metadata
+
+register_mcp_metadata(
+    "projects.list",
+    {"include": True, "annotations": {"readOnlyHint": True}},
+)
+click_mcp("inventory", cli, include_all_commands=False)
+```
+
+The MCP client sees only `projects_list`. The rest of the commands remain
+available through the CLI. Use the registered CLI path relative to the root
+for metadata, including the alias name when selecting an alias. Legacy
+leaf-name metadata still applies when the full path has no metadata, so use
+full paths for allowlists and omit broad leaf-name inclusions.
+
+Hidden commands and descendants of hidden groups are skipped even when
+explicitly selected. Set `include_hidden=True` to make them eligible for the
+same inclusion rules.
+
+Keep destructive, administrative, and arbitrary shell passthrough commands
+out of the allowlist unless clients need them. MCP tool annotations describe
+behavior to clients. The allowlist controls which commands the server exposes.
+See [tool hints (#7)](https://github.com/crowecawcaw/click-mcp/issues/7).
 
 ### Working with Positional Arguments
 
