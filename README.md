@@ -290,6 +290,27 @@ The MCP server will correctly convert these to positional arguments when executi
 copy file.txt /tmp/file.txt --overwrite
 ```
 
+### Validating tool arguments strictly
+
+Pass `strict_arguments=True` to `click_mcp()` to validate arguments for tools
+with generated input schemas before running the CLI command:
+
+```python
+@click_mcp(server_name="my-cli-app", strict_arguments=True)
+@click.group()
+def cli():
+    """Sample CLI application."""
+```
+
+Generated schemas disallow additional properties in this mode. Unknown
+arguments return a tool error listing the unexpected names and the accepted
+names. Known arguments must match the advertised schema, including types and
+required fields. The default is `False`, which preserves Click's usual input
+coercion and ignores unknown MCP arguments.
+
+A custom `ToolAdapter.input_schema` still controls validation for that tool.
+This setting affects only MCP calls, not normal CLI usage.
+
 ### Structured tool inputs and results
 
 Register a `ToolAdapter` when a command accepts structured data or returns a

@@ -66,6 +66,7 @@ def scan_tool_routes(
     include_all_commands: bool = True,
     *,
     include_hidden: bool = False,
+    strict_arguments: bool = False,
     command_metadata: CommandMetadata | None = None,
 ) -> dict[str, ToolRoute]:
     """Build a tool table with the Click path and parameters for each tool."""
@@ -128,7 +129,9 @@ def scan_tool_routes(
                         f"Commands {previous!r} and {current!r} both map to {tool_name!r}"
                     )
                 adapter = metadata.get("adapter")
-                tool = _create_tool(tool_name, cmd, command_chain, metadata, adapter)
+                tool = _create_tool(
+                    tool_name, cmd, command_chain, metadata, adapter, strict_arguments
+                )
                 routes[tool_name] = ToolRoute(
                     tool, command_path, command_chain, adapter
                 )
@@ -143,6 +146,7 @@ def _create_tool(
     commands: tuple[click.Command, ...],
     metadata: Mapping[str, Any],
     adapter: ToolAdapter | None,
+    strict_arguments: bool,
 ) -> types.Tool:
     properties: dict[str, dict[str, Any]] = {}
     required: set[str] = set()
@@ -160,6 +164,8 @@ def _create_tool(
     input_schema: dict[str, Any] = {"type": "object", "properties": properties}
     if required:
         input_schema["required"] = sorted(required)
+    if strict_arguments:
+        input_schema["additionalProperties"] = False
 
     return types.Tool(
         name=tool_name,

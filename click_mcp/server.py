@@ -40,6 +40,7 @@ class MCPServer:
         include_all_commands: bool = True,
         *,
         include_hidden: bool = False,
+        strict_arguments: bool = False,
         command_metadata: CommandMetadata | None = None,
         configure_server: ConfigureServer | None = None,
         on_tool_complete: ToolCompletionHook | None = None,
@@ -52,6 +53,7 @@ class MCPServer:
             server_name: The name of the MCP server.
             include_all_commands: Expose commands by default.
             include_hidden: Whether hidden commands and groups can be exposed.
+            strict_arguments: Validate generated tool inputs against their MCP schemas.
             command_metadata: Server-local metadata keyed by exact command path.
             configure_server: Optional callback to register SDK handlers at startup.
             on_tool_complete: Optional async callback after tool invocation.
@@ -59,10 +61,12 @@ class MCPServer:
         self.cli_group = cli_group
         self.server_name = server_name
         self.on_tool_complete = on_tool_complete
+        self._strict_arguments = strict_arguments
         self.routes = scan_tool_routes(
             cli_group,
             include_all_commands,
             include_hidden=include_hidden,
+            strict_arguments=strict_arguments,
             command_metadata=command_metadata,
         )
         self.click_tools = [route.tool for route in self.routes.values()]
@@ -132,7 +136,18 @@ class MCPServer:
         self, route: ToolRoute, arguments: dict[str, Any]
     ) -> types.CallToolResult:
         adapter = route.adapter
-        if adapter is not None and adapter.input_schema is not None:
+        custom_schema = adapter is not None and adapter.input_schema is not None
+        strict_generated = self._strict_arguments and not custom_schema
+        if strict_generated:
+            properties = route.tool.input_schema["properties"]
+            unknown = arguments.keys() - properties.keys()
+            if unknown:
+                unexpected = ", ".join(map(repr, sorted(unknown)))
+                allowed = ", ".join(map(repr, sorted(properties))) or "(none)"
+                raise _ToolExecutionError(
+                    f"Unknown tool arguments: {unexpected}. Valid arguments: {allowed}."
+                )
+        if strict_generated or custom_schema:
             try:
                 validate(arguments, route.tool.input_schema)
             except ValidationError as exc:

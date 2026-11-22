@@ -50,6 +50,7 @@ def click_mcp(
     include_all_commands: bool = True,
     *,
     include_hidden: bool = False,
+    strict_arguments: bool = False,
     command_metadata: CommandMetadata | None = None,
     configure_server: ConfigureServer | None = None,
     on_tool_complete: ToolCompletionHook | None = None,
@@ -64,6 +65,7 @@ def click_mcp(
         server_name: The name of the MCP server to use. Required.
         include_all_commands: Whether to include commands by default.
         include_hidden: Whether hidden commands and groups can be exposed.
+        strict_arguments: Validate generated tool inputs against their MCP schemas.
         command_metadata: Server-local metadata keyed by exact command path.
         configure_server: Optional callback to register SDK handlers at startup.
         on_tool_complete: Optional async callback after tool invocation.
@@ -81,6 +83,7 @@ def click_mcp(
             server_name,
             include_all_commands,
             include_hidden,
+            strict_arguments,
             command_metadata,
             configure_server,
             on_tool_complete,
@@ -94,6 +97,7 @@ def click_mcp(
             server_name,
             include_all_commands,
             include_hidden,
+            strict_arguments,
             command_metadata,
             configure_server,
             on_tool_complete,
@@ -108,6 +112,7 @@ def _add_mcp_command(
     server_name: str,
     include_all_commands: bool,
     include_hidden: bool,
+    strict_arguments: bool,
     command_metadata: CommandMetadata | None,
     configure_server: ConfigureServer | None,
     on_tool_complete: ToolCompletionHook | None,
@@ -122,6 +127,7 @@ def _add_mcp_command(
             server_name,
             include_all_commands,
             include_hidden=include_hidden,
+            strict_arguments=strict_arguments,
             command_metadata=command_metadata,
             configure_server=configure_server,
             on_tool_complete=on_tool_complete,
