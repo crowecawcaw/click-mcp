@@ -63,7 +63,8 @@ def scan_tool_routes(
         commands: tuple[click.Command, ...],
         parent_ctx: click.Context | None = None,
     ) -> None:
-        with group.context_class(group, parent=parent_ctx, info_name=group.name) as ctx:
+        context_class = getattr(group, "context_class", click.Context)
+        with context_class(group, parent=parent_ctx, info_name=group.name) as ctx:
             for name in group.list_commands(ctx):
                 cmd = group.get_command(ctx, name)
                 if not cmd or getattr(cmd, "_is_mcp_command", False):

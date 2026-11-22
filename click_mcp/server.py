@@ -118,8 +118,12 @@ class MCPServer:
             try:
                 # Use Click's main() method which handles parent-child execution naturally
                 self.cli_group.main(args=args, standalone_mode=False)
-            except Exception as e:
-                raise ValueError(f"Command execution failed: {str(e)}") from e
+            except click.ClickException as exc:
+                raise ValueError(
+                    f"Command execution failed: {exc.format_message()}"
+                ) from exc
+            except Exception as exc:
+                raise ValueError(f"Command execution failed: {exc}") from exc
 
         return {"output": output.getvalue().rstrip()}
 

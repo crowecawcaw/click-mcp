@@ -8,11 +8,16 @@ on:
 
 jobs:
   test:
+    name: test (${{ matrix.python-version }}${{ matrix.click-version != 'latest' && ', Click 7.0' || '' }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         python-version: ['3.10', '3.11', '3.12', '3.13', '3.14']
+        click-version: ['latest']
+        include:
+          - python-version: '3.10'
+            click-version: '7.0'
 
     steps:
       - uses: actions/checkout@v7
@@ -26,6 +31,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e .[test]
+      - name: Install minimum supported Click
+        if: matrix.click-version != 'latest'
+        run: python -m pip install 'click==${{ matrix.click-version }}'
       - name: Run tests
         run: |
           pytest tests/
