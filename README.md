@@ -146,6 +146,41 @@ def delete(username):
 
 When exposed as MCP tools, the nested commands will be available with their full path using underscores (e.g., `users_create` and `users_delete`).
 
+### Using a Typer command group
+
+Build a command group from your Typer app and attach the server command to
+that group. Use a root callback or multiple commands so the app produces a
+group.
+
+```python
+import typer
+from typer.main import get_command
+
+from click_mcp import click_mcp
+
+app = typer.Typer()
+
+
+@app.callback()
+def main():
+    """Team directory."""
+
+
+@app.command()
+def member(member_id: int, limit: int = 3):
+    """Show a team member."""
+    typer.echo(f"Member {member_id}, limit {limit}")
+
+
+if __name__ == "__main__":
+    group = get_command(app)
+    click_mcp("directory", group)
+    group()
+```
+
+Run `python directory.py mcp` to expose the generated tools. Typer remains
+an optional dependency.
+
 ### Exposing only selected commands
 
 For an inventory CLI with `projects list`, `projects delete`, and an internal

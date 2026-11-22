@@ -14,6 +14,7 @@ from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
 
 from . import __version__
+from .compat import invoke_command, is_exposed_parameter
 from .scanner import scan_tool_routes
 
 
@@ -111,7 +112,9 @@ class MCPServer:
             positionals = [
                 param.name
                 for param in command.params
-                if isinstance(param, click.Argument) and param.name is not None
+                if param.param_type_name == "argument"
+                and param.name is not None
+                and is_exposed_parameter(param)
             ]
             args.extend(
                 self._convert_parameters_to_args(
@@ -128,10 +131,7 @@ class MCPServer:
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
                 # Invoke Click directly so an Exit remains distinguishable from
                 # an integer callback return value.
-                with self.cli_group.make_context(
-                    self.cli_group.name or "cli", args
-                ) as ctx:
-                    self.cli_group.invoke(ctx)
+                invoke_command(self.cli_group, args)
         except click.UsageError as exc:
             raise _ToolExecutionError(
                 f"Invalid command arguments (exit code {exc.exit_code}): {exc.format_message()}"
@@ -190,22 +190,23 @@ class MCPServer:
         options: list[str] = []
         for param in param_definitions:
             if (
-                not isinstance(param, click.Option)
-                or param.hidden
+                param.param_type_name != "option"
+                or not is_exposed_parameter(param)
                 or param.name not in parameters
             ):
                 continue
             value = parameters[param.name]
+            option_param: Any = param
             option = next(
                 (opt for opt in param.opts if opt.startswith("--")), param.opts[0]
             )
-            if param.is_bool_flag:
+            if option_param.is_bool_flag:
                 if value:
                     options.append(option)
                 elif param.secondary_opts:
                     options.append(param.secondary_opts[0])
-            elif param.is_flag:
-                if value == param.flag_value:
+            elif option_param.is_flag:
+                if value == option_param.flag_value:
                     options.append(option)
             elif option.startswith("--"):
                 options.append(f"{option}={value}")

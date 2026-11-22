@@ -85,7 +85,6 @@ def _add_mcp_command(
     """Add an MCP command to a Click group."""
     from .server import MCPServer
 
-    @cli_group.command(name=command_name)
     def mcp_command() -> None:
         """Start the MCP server for this CLI application."""
         server = MCPServer(
@@ -93,7 +92,18 @@ def _add_mcp_command(
         )
         server.run()
 
-    # Mark this command as an MCP command for robust detection
-    mcp_command._is_mcp_command = True  # type: ignore[attr-defined]
+    command: Any
+    if hasattr(cli_group, "command"):
+        command = cli_group.command(name=command_name)(mcp_command)
+    else:
+        from typer.core import TyperCommand
+
+        command = TyperCommand(
+            name=command_name, callback=mcp_command, help=mcp_command.__doc__
+        )
+        cli_group.add_command(command)
+
+    # Mark this command as an MCP command for robust detection.
+    command._is_mcp_command = True  # type: ignore[attr-defined]
 
     return cli_group
