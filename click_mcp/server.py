@@ -6,6 +6,8 @@ import asyncio
 import contextlib
 import io
 import json
+import logging
+from time import perf_counter
 from typing import Any, Dict, List, Optional
 
 import click
@@ -17,7 +19,10 @@ from mcp.server.lowlevel import Server
 
 from . import __version__
 from .compat import invoke_command, is_exposed_parameter
+from .hooks import ConfigureServer, ToolCompletion, ToolCompletionHook
 from .scanner import ToolRoute, scan_tool_routes
+
+logger = logging.getLogger(__name__)
 
 
 class _ToolExecutionError(ValueError):
@@ -34,6 +39,8 @@ class MCPServer:
         include_all_commands: bool = True,
         *,
         include_hidden: bool = False,
+        configure_server: ConfigureServer | None = None,
+        on_tool_complete: ToolCompletionHook | None = None,
     ):
         """
         Initialize the MCP server.
@@ -43,9 +50,12 @@ class MCPServer:
             server_name: The name of the MCP server.
             include_all_commands: Expose commands by default.
             include_hidden: Whether hidden commands and groups can be exposed.
+            configure_server: Optional callback to register SDK handlers at startup.
+            on_tool_complete: Optional async callback after tool invocation.
         """
         self.cli_group = cli_group
         self.server_name = server_name
+        self.on_tool_complete = on_tool_complete
         self.routes = scan_tool_routes(
             cli_group, include_all_commands, include_hidden=include_hidden
         )
@@ -58,6 +68,8 @@ class MCPServer:
             on_call_tool=self._handle_call_tool,
             get_tool_input_schema=self._get_tool_input_schema,
         )
+        if configure_server is not None:
+            configure_server(self.server)
 
     def _get_tool_input_schema(self, name: str) -> dict[str, Any] | None:
         tool = self.tool_map.get(name)
@@ -82,18 +94,33 @@ class MCPServer:
         return types.ListToolsResult(tools=self.click_tools)
 
     async def _handle_call_tool(
-        self, _ctx: ServerRequestContext, params: types.CallToolRequestParams
+        self, ctx: ServerRequestContext, params: types.CallToolRequestParams
     ) -> types.CallToolResult:
+        route = self.routes.get(params.name)
+        started = perf_counter()
         try:
-            route = self.routes.get(params.name)
             if route is None:
                 raise _ToolExecutionError(f"Unknown tool: {params.name}")
-            return self._call_route(route, params.arguments or {})
+            result = self._call_route(route, params.arguments or {})
         except _ToolExecutionError as exc:
-            return types.CallToolResult(
+            result = types.CallToolResult(
                 content=[types.TextContent(type="text", text=str(exc))],
                 is_error=True,
             )
+
+        if route is not None and self.on_tool_complete is not None:
+            completion = ToolCompletion(
+                tool_name=route.tool.name,
+                command_path=route.path,
+                context=ctx,
+                is_error=bool(result.is_error),
+                duration_seconds=perf_counter() - started,
+            )
+            try:
+                await self.on_tool_complete(completion)
+            except Exception:
+                logger.exception("Tool completion hook failed for %s", route.tool.name)
+        return result
 
     def _call_route(
         self, route: ToolRoute, arguments: dict[str, Any]
