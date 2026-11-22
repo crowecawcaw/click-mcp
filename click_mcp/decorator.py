@@ -6,6 +6,8 @@ from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 import click
 
+from .hooks import ConfigureServer, ToolCompletionHook
+
 # Registry for MCP metadata
 _MCP_REGISTRY: Dict[str, Dict[str, Any]] = {}
 
@@ -43,6 +45,8 @@ def click_mcp(
     include_all_commands: bool = True,
     *,
     include_hidden: bool = False,
+    configure_server: ConfigureServer | None = None,
+    on_tool_complete: ToolCompletionHook | None = None,
 ) -> Union[Callable[[click.Group], click.Group], click.Group]:
     """
     Decorator that adds MCP support to a Click application.
@@ -54,6 +58,8 @@ def click_mcp(
         server_name: The name of the MCP server to use. Required.
         include_all_commands: Whether to include commands by default.
         include_hidden: Whether hidden commands and groups can be exposed.
+        configure_server: Optional callback to register SDK handlers at startup.
+        on_tool_complete: Optional async callback after tool invocation.
 
     Returns:
         The decorated Click group.
@@ -63,13 +69,25 @@ def click_mcp(
     # Handle case where decorator is used without arguments
     if cli_group is not None:
         return _add_mcp_command(
-            cli_group, command_name, server_name, include_all_commands, include_hidden
+            cli_group,
+            command_name,
+            server_name,
+            include_all_commands,
+            include_hidden,
+            configure_server,
+            on_tool_complete,
         )
 
     # Handle case where decorator is used with arguments
     def decorator(group: click.Group) -> click.Group:
         return _add_mcp_command(
-            group, command_name, server_name, include_all_commands, include_hidden
+            group,
+            command_name,
+            server_name,
+            include_all_commands,
+            include_hidden,
+            configure_server,
+            on_tool_complete,
         )
 
     return decorator
@@ -81,6 +99,8 @@ def _add_mcp_command(
     server_name: str,
     include_all_commands: bool,
     include_hidden: bool,
+    configure_server: ConfigureServer | None,
+    on_tool_complete: ToolCompletionHook | None,
 ) -> click.Group:
     """Add an MCP command to a Click group."""
     from .server import MCPServer
@@ -88,7 +108,12 @@ def _add_mcp_command(
     def mcp_command() -> None:
         """Start the MCP server for this CLI application."""
         server = MCPServer(
-            cli_group, server_name, include_all_commands, include_hidden=include_hidden
+            cli_group,
+            server_name,
+            include_all_commands,
+            include_hidden=include_hidden,
+            configure_server=configure_server,
+            on_tool_complete=on_tool_complete,
         )
         server.run()
 

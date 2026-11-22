@@ -6,11 +6,15 @@ from typing import Any, Dict, Generator, List, Tuple
 
 import pytest
 from mcp import ClientSession, StdioServerParameters, stdio_client
+from mcp.client.session import MessageHandlerFnT
 
 
 @asynccontextmanager
 async def mcp_server_client(
-    script_path: Path, command_name: str = "mcp"
+    script_path: Path,
+    command_name: str = "mcp",
+    *,
+    message_handler: MessageHandlerFnT | None = None,
 ) -> Generator[Tuple[subprocess.Popen, Any, List[Dict]], None, None]:
     server_params = StdioServerParameters(
         command=sys.executable,  # Executable
@@ -22,6 +26,7 @@ async def mcp_server_client(
         async with ClientSession(
             read,
             write,
+            message_handler=message_handler,
         ) as session:
             await session.initialize()
             yield session

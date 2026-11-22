@@ -346,6 +346,57 @@ def process(filename):
 
 If the file doesn't exist, the AI agent will receive an error message that it can present to the user or use to take corrective action.
 
+### Resources and tool completion hooks
+
+Generated tools are the default. To serve read-only resources alongside them,
+pass a `configure_server` callback to register MCP SDK handlers before the
+server starts. The SDK handles discovery and dispatch.
+
+```python
+from mcp import types
+
+from click_mcp import ToolCompletion, click_mcp
+
+SUMMARY = "inventory://projects/summary"
+TEMPLATE = "inventory://projects/{project}"
+
+
+def configure_server(server):
+    server.add_request_handler(
+        "resources/list", types.PaginatedRequestParams, list_resources
+    )
+    server.add_request_handler(
+        "resources/templates/list", types.PaginatedRequestParams, list_templates
+    )
+    server.add_request_handler(
+        "resources/read", types.ReadResourceRequestParams, read_resource
+    )
+
+
+async def on_tool_complete(event: ToolCompletion):
+    if event.command_path == ("projects", "publish") and not event.is_error:
+        await event.context.session.send_resource_updated(SUMMARY)
+
+
+click_mcp(
+    "inventory",
+    cli,
+    configure_server=configure_server,
+    on_tool_complete=on_tool_complete,
+)
+```
+
+The [runnable example](tests/resources_cli.py) defines the three async resource
+handlers and the `projects publish` command. Its resource list advertises
+`inventory://projects/summary`, its template list advertises
+`inventory://projects/{project}`, and its read handler serves both kinds of URI.
+
+The optional completion hook receives the MCP tool name, original CLI path,
+request context, error status, and execution duration in seconds. It runs after
+a known tool has been handled and before its response is sent. Requests rejected
+before reaching the tool handler bypass the hook. The server logs hook exceptions
+and returns the tool's original result. Click command callbacks remain synchronous.
+
 ## Development
 
 ### Setup
