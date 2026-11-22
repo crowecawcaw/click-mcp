@@ -17,6 +17,10 @@ from . import __version__
 from .scanner import scan_tool_routes
 
 
+class _ToolExecutionError(ValueError):
+    """An execution failure whose message is safe to send to the MCP client."""
+
+
 class MCPServer:
     """MCP server for Click applications."""
 
@@ -74,9 +78,9 @@ class MCPServer:
     ) -> types.CallToolResult:
         try:
             if params.name not in self.tool_map:
-                raise ValueError(f"Unknown tool: {params.name}")
+                raise _ToolExecutionError(f"Unknown tool: {params.name}")
             result = self._execute_command(params.name, params.arguments or {})
-        except ValueError as exc:
+        except _ToolExecutionError as exc:
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text=str(exc))],
                 is_error=True,
@@ -114,18 +118,47 @@ class MCPServer:
     def _run_click_command(self, args: List[str]) -> Dict[str, Any]:
         """Execute the Click command with prepared arguments."""
         output = io.StringIO()
-        with contextlib.redirect_stdout(output):
-            try:
-                # Use Click's main() method which handles parent-child execution naturally
-                self.cli_group.main(args=args, standalone_mode=False)
-            except click.ClickException as exc:
-                raise ValueError(
-                    f"Command execution failed: {exc.format_message()}"
-                ) from exc
-            except Exception as exc:
-                raise ValueError(f"Command execution failed: {exc}") from exc
+        errors = io.StringIO()
+        try:
+            with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
+                # Invoke Click directly so an Exit remains distinguishable from
+                # an integer callback return value.
+                with self.cli_group.make_context(
+                    self.cli_group.name or "cli", args
+                ) as ctx:
+                    self.cli_group.invoke(ctx)
+        except click.UsageError as exc:
+            raise _ToolExecutionError(
+                f"Invalid command arguments (exit code {exc.exit_code}): {exc.format_message()}"
+            ) from exc
+        except click.ClickException as exc:
+            raise _ToolExecutionError(
+                self._with_stderr(
+                    f"Command failed (exit code {exc.exit_code}): {exc.format_message()}",
+                    errors,
+                )
+            ) from exc
+        except (click.Abort, EOFError, KeyboardInterrupt) as exc:
+            raise _ToolExecutionError(
+                self._with_stderr("Command aborted (exit code 1)", errors)
+            ) from exc
+        except (click.exceptions.Exit, SystemExit) as exc:
+            code = exc.exit_code if isinstance(exc, click.exceptions.Exit) else exc.code
+            if code is not None and code != 0:
+                if isinstance(code, int):
+                    status = f"Command exited with code {code}"
+                else:
+                    status = "Command exited with code 1"
+                raise _ToolExecutionError(self._with_stderr(status, errors)) from exc
+        except Exception as exc:
+            raise _ToolExecutionError("Command failed unexpectedly") from exc
 
         return {"output": output.getvalue().rstrip()}
+
+    @staticmethod
+    def _with_stderr(message: str, errors: io.StringIO) -> str:
+        stderr = errors.getvalue().strip()
+        return f"{message}\n{stderr}" if stderr else message
 
     def _convert_parameters_to_args(
         self,
