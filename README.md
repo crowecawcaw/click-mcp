@@ -146,6 +146,11 @@ def delete(username):
 
 When exposed as MCP tools, the nested commands will be available with their full path using underscores (e.g., `users_create` and `users_delete`).
 
+An exposed command needs unique parameter names across its parent groups and
+its own parameters. If two parameters share a name, server startup reports the
+tool and the duplicate parameter. Give the two Click parameters distinct
+destination names to expose both.
+
 ### Using a Typer command group
 
 Build a command group from your Typer app and attach the server command to
@@ -188,20 +193,27 @@ For an inventory CLI with `projects list`, `projects delete`, and an internal
 
 ```python
 from click_mcp import click_mcp
-from click_mcp.decorator import register_mcp_metadata
 
-register_mcp_metadata(
-    "projects.list",
-    {"include": True, "annotations": {"readOnlyHint": True}},
+click_mcp(
+    "inventory",
+    cli,
+    include_all_commands=False,
+    command_metadata={
+        ("projects", "list"): {
+            "include": True,
+            "annotations": {"readOnlyHint": True},
+        },
+    },
 )
-click_mcp("inventory", cli, include_all_commands=False)
 ```
 
 The MCP client sees only `projects_list`. The rest of the commands remain
-available through the CLI. Use the registered CLI path relative to the root
-for metadata, including the alias name when selecting an alias. Legacy
-leaf-name metadata still applies when the full path has no metadata, so use
-full paths for allowlists and omit broad leaf-name inclusions.
+available through the CLI. Keys are CLI paths relative to the root, using the
+registered alias name when selecting an alias. Use tuples for exact path
+segments, or dotted strings such as `"projects.list"` for ordinary names.
+When supplied, `command_metadata` is the server's sole source of metadata.
+Servers that omit it continue to use the process-wide
+`register_mcp_metadata()` registry with legacy leaf-name fallback.
 
 Hidden commands and descendants of hidden groups are skipped even when
 explicitly selected. Set `include_hidden=True` to make them eligible for the
@@ -345,6 +357,11 @@ def process(filename):
 ```
 
 If the file doesn't exist, the AI agent will receive an error message that it can present to the user or use to take corrective action.
+
+Click groups with a custom `main()` are invoked with `standalone_mode=False`.
+Click may return an integer for an exit in that mode, so a custom entry point
+that needs to report a nonzero exit to MCP should raise `SystemExit` or
+`click.ClickException` instead of returning a status code.
 
 ### Resources and tool completion hooks
 

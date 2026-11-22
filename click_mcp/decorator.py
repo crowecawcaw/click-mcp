@@ -2,6 +2,7 @@
 Decorator for adding MCP support to Click applications.
 """
 
+from collections.abc import Mapping
 from typing import Any, Callable, Dict, Optional, TypeVar, Union
 
 import click
@@ -10,6 +11,10 @@ from .hooks import ConfigureServer, ToolCompletionHook
 
 # Registry for MCP metadata
 _MCP_REGISTRY: Dict[str, Dict[str, Any]] = {}
+
+CommandMetadata = (
+    Mapping[str, Mapping[str, Any]] | Mapping[tuple[str, ...], Mapping[str, Any]]
+)
 
 F = TypeVar("F", bound=Callable[..., Any])
 
@@ -45,6 +50,7 @@ def click_mcp(
     include_all_commands: bool = True,
     *,
     include_hidden: bool = False,
+    command_metadata: CommandMetadata | None = None,
     configure_server: ConfigureServer | None = None,
     on_tool_complete: ToolCompletionHook | None = None,
 ) -> Union[Callable[[click.Group], click.Group], click.Group]:
@@ -58,6 +64,7 @@ def click_mcp(
         server_name: The name of the MCP server to use. Required.
         include_all_commands: Whether to include commands by default.
         include_hidden: Whether hidden commands and groups can be exposed.
+        command_metadata: Server-local metadata keyed by exact command path.
         configure_server: Optional callback to register SDK handlers at startup.
         on_tool_complete: Optional async callback after tool invocation.
 
@@ -74,6 +81,7 @@ def click_mcp(
             server_name,
             include_all_commands,
             include_hidden,
+            command_metadata,
             configure_server,
             on_tool_complete,
         )
@@ -86,6 +94,7 @@ def click_mcp(
             server_name,
             include_all_commands,
             include_hidden,
+            command_metadata,
             configure_server,
             on_tool_complete,
         )
@@ -99,6 +108,7 @@ def _add_mcp_command(
     server_name: str,
     include_all_commands: bool,
     include_hidden: bool,
+    command_metadata: CommandMetadata | None,
     configure_server: ConfigureServer | None,
     on_tool_complete: ToolCompletionHook | None,
 ) -> click.Group:
@@ -112,6 +122,7 @@ def _add_mcp_command(
             server_name,
             include_all_commands,
             include_hidden=include_hidden,
+            command_metadata=command_metadata,
             configure_server=configure_server,
             on_tool_complete=on_tool_complete,
         )
