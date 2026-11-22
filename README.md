@@ -21,7 +21,7 @@ The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/specification
 
 ## Installation
 
-Requires Python 3.10 or later and the MCP Python SDK 2.3 or later in the 2.x series.
+Requires Python 3.10 or later and the MCP Python SDK 2.3 or later in the 2.x series. CI tests Python 3.10 through 3.15.
 
 ```bash
 pip install click-mcp
