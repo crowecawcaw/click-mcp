@@ -26,6 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "click>=7.0",
+    "jsonschema>=4.0",
     "mcp>=2.3,<3",
 ]
 
@@ -36,7 +37,6 @@ test = [
     "pytest-timeout",
     "trio",
     "typer>=0.29",
-    "jsonschema>=4.0",
 ]
 
 [project.urls]

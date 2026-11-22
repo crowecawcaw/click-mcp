@@ -5,17 +5,19 @@ MCP server implementation for Click applications using the MCP library.
 import asyncio
 import contextlib
 import io
+import json
 from typing import Any, Dict, List, Optional
 
 import click
 import mcp.types as types
+from jsonschema import SchemaError, ValidationError, validate
 from mcp.server import stdio
 from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
 
 from . import __version__
 from .compat import invoke_command, is_exposed_parameter
-from .scanner import scan_tool_routes
+from .scanner import ToolRoute, scan_tool_routes
 
 
 class _ToolExecutionError(ValueError):
@@ -83,16 +85,57 @@ class MCPServer:
         self, _ctx: ServerRequestContext, params: types.CallToolRequestParams
     ) -> types.CallToolResult:
         try:
-            if params.name not in self.tool_map:
+            route = self.routes.get(params.name)
+            if route is None:
                 raise _ToolExecutionError(f"Unknown tool: {params.name}")
-            result = self._execute_command(params.name, params.arguments or {})
+            return self._call_route(route, params.arguments or {})
         except _ToolExecutionError as exc:
             return types.CallToolResult(
                 content=[types.TextContent(type="text", text=str(exc))],
                 is_error=True,
             )
+
+    def _call_route(
+        self, route: ToolRoute, arguments: dict[str, Any]
+    ) -> types.CallToolResult:
+        adapter = route.adapter
+        if adapter is not None and adapter.input_schema is not None:
+            try:
+                validate(arguments, route.tool.input_schema)
+            except ValidationError as exc:
+                raise _ToolExecutionError(
+                    f"Invalid tool arguments at {exc.json_path}: failed {exc.validator} validation"
+                ) from exc
+            except SchemaError as exc:
+                raise _ToolExecutionError("Invalid tool input schema") from exc
+        if adapter is not None and adapter.adapt_arguments is not None:
+            try:
+                arguments = adapter.adapt_arguments(arguments)
+                if not isinstance(arguments, dict):
+                    raise TypeError("Expected a dictionary of CLI parameter values")
+            except Exception as exc:
+                raise _ToolExecutionError(
+                    "Could not adapt tool arguments for CLI invocation"
+                ) from exc
+
+        result = self._execute_command(route.tool.name, arguments)
+        text = result["output"]
+        structured_content = None
+        if adapter is not None and adapter.adapt_result is not None:
+            try:
+                adapted = adapter.adapt_result(result["return_value"])
+                if not isinstance(adapted, dict):
+                    raise TypeError("Expected a JSON object")
+                text = json.dumps(adapted, allow_nan=False)
+                structured_content = json.loads(text)
+            except Exception as exc:
+                raise _ToolExecutionError(
+                    "Could not serialize the tool result as a JSON object"
+                ) from exc
+
         return types.CallToolResult(
-            content=[types.TextContent(type="text", text=result["output"])]
+            content=[types.TextContent(type="text", text=text)],
+            structured_content=structured_content,
         )
 
     def _execute_command(
@@ -127,11 +170,12 @@ class MCPServer:
         """Execute the Click command with prepared arguments."""
         output = io.StringIO()
         errors = io.StringIO()
+        return_value = None
         try:
             with contextlib.redirect_stdout(output), contextlib.redirect_stderr(errors):
                 # Invoke Click directly so an Exit remains distinguishable from
                 # an integer callback return value.
-                invoke_command(self.cli_group, args)
+                return_value = invoke_command(self.cli_group, args)
         except click.UsageError as exc:
             raise _ToolExecutionError(
                 f"Invalid command arguments (exit code {exc.exit_code}): {exc.format_message()}"
@@ -158,7 +202,7 @@ class MCPServer:
         except Exception as exc:
             raise _ToolExecutionError("Command failed unexpectedly") from exc
 
-        return {"output": output.getvalue().rstrip()}
+        return {"output": output.getvalue().rstrip(), "return_value": return_value}
 
     @staticmethod
     def _with_stderr(message: str, errors: io.StringIO) -> str:
