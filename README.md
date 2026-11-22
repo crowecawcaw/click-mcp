@@ -278,6 +278,55 @@ The MCP server will correctly convert these to positional arguments when executi
 copy file.txt /tmp/file.txt --overwrite
 ```
 
+### Structured tool inputs and results
+
+Register a `ToolAdapter` when a command accepts structured data or returns a
+Python value. The custom schema describes the MCP input. The argument adapter
+maps it to Click parameter names, and Click still parses and invokes the command
+normally.
+
+```python
+import json
+
+from click_mcp import ToolAdapter
+from click_mcp.decorator import register_mcp_metadata
+
+
+@cli.command()
+@click.option("--query-json", required=True)
+def lookup(query_json):
+    query = json.loads(query_json)
+    return {"matched": [query["name"].upper()]}
+
+
+register_mcp_metadata(
+    "lookup",
+    {
+        "adapter": ToolAdapter(
+            input_schema={
+                "type": "object",
+                "required": ["query"],
+                "properties": {
+                    "query": {
+                        "type": "object",
+                        "properties": {"name": {"type": "string"}},
+                        "required": ["name"],
+                    }
+                },
+            },
+            adapt_arguments=lambda args: {"query_json": json.dumps(args["query"])},
+            adapt_result=dict,
+        ),
+    },
+)
+```
+
+With this adapter, calling `lookup` with `{"query": {"name": "Ada"}}` returns
+`{"matched": ["ADA"]}` as MCP structured content and JSON text. The result
+adapter receives the value returned by the Click invocation, including any
+group result callback. It must produce a JSON object. Commands without a result
+adapter continue to return captured stdout.
+
 ### Handling Command Errors
 
 When a Click command raises an exception, `click-mcp` captures the error and returns it as part of the MCP response. This allows AI agents to handle errors gracefully:

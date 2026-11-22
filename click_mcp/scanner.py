@@ -10,6 +10,7 @@ from typing import Any
 import click
 import mcp.types as types
 
+from .adapter import ToolAdapter
 from .compat import is_exposed_parameter, is_group, parameter_type
 from .decorator import get_mcp_metadata
 
@@ -21,6 +22,7 @@ class ToolRoute:
     tool: types.Tool
     path: tuple[str, ...]
     commands: tuple[click.Command, ...]
+    adapter: ToolAdapter | None = None
 
 
 def sanitize_tool_name(name: str) -> str:
@@ -106,8 +108,11 @@ def scan_tool_routes(
                     raise ValueError(
                         f"Commands {previous!r} and {current!r} both map to {tool_name!r}"
                     )
-                tool = _create_tool(tool_name, cmd, command_chain, metadata)
-                routes[tool_name] = ToolRoute(tool, command_path, command_chain)
+                adapter = metadata.get("adapter")
+                tool = _create_tool(tool_name, cmd, command_chain, metadata, adapter)
+                routes[tool_name] = ToolRoute(
+                    tool, command_path, command_chain, adapter
+                )
 
     scan_group(command, (), (), (command,))
     return routes
@@ -118,6 +123,7 @@ def _create_tool(
     cmd: click.Command,
     commands: tuple[click.Command, ...],
     metadata: dict[str, Any],
+    adapter: ToolAdapter | None,
 ) -> types.Tool:
     properties: dict[str, dict[str, Any]] = {}
     required: set[str] = set()
@@ -135,7 +141,11 @@ def _create_tool(
     return types.Tool(
         name=tool_name,
         description=cmd.help or cmd.short_help or "",
-        input_schema=input_schema,
+        input_schema=(
+            adapter.input_schema
+            if adapter is not None and adapter.input_schema is not None
+            else input_schema
+        ),
         annotations=metadata.get("annotations"),
     )
 
