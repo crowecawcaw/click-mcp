@@ -9,7 +9,7 @@ A Python library that extends Click applications with Model Context Protocol (MC
 
 `click-mcp` provides a simple decorator that converts Click commands into MCP tools. This enables AI agents to discover and interact with your CLI applications programmatically.
 
-The [Model Context Protocol (MCP)](https://github.com/model-context-protocol/mcp) is an open standard for AI agents to interact with tools and applications in a structured way.
+The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol/servers) is an open standard for AI agents to interact with tools and applications in a structured way.
 
 ## Key Features
 
@@ -298,9 +298,9 @@ hatch run docs
 
 ## Related Resources
 
-- [Model Context Protocol (MCP) Specification](https://github.com/model-context-protocol/mcp)
+- [Model Context Protocol (MCP) Specification](https://modelcontextprotocol.io/specification)
 - [Click Documentation](https://click.palletsprojects.com/)
-- [MCP Tools Registry](https://github.com/model-context-protocol/registry) - A collection of MCP-compatible tools
+- [MCP Tools Registry](https://github.com/modelcontextprotocol/registry) - A collection of MCP-compatible tools
 
 ## License
 
