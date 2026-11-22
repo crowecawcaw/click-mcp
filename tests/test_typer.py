@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -10,7 +11,9 @@ SCRIPT = Path(__file__).with_name("typer_cli.py")
 @pytest.mark.anyio
 async def test_typer_nested_tool_schema_and_invocation():
     async with mcp_server_client(SCRIPT) as session:
-        [tool] = (await session.list_tools()).tools
+        tools = {tool.name: tool for tool in (await session.list_tools()).tools}
+        assert set(tools) == {"teams_members_show", "teams_members_collect"}
+        tool = tools["teams_members_show"]
         assert tool.name == "teams_members_show"
         assert tool.description == "Show a member's directory entry."
         assert tool.input_schema == {
@@ -55,3 +58,18 @@ async def test_typer_hidden_command_exit():
         result = await session.call_tool(tool, {})
         assert result.is_error
         assert result.content[0].text == "Command exited with code 4"
+
+
+@pytest.mark.anyio
+async def test_typer_collection_and_literal_round_trip():
+    async with mcp_server_client(SCRIPT) as session:
+        tools = {tool.name: tool for tool in (await session.list_tools()).tools}
+        tool = tools["teams_members_collect"]
+        assert tool.input_schema["properties"] == {
+            "tags": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+            "level": {"type": "integer", "enum": [1, 2], "default": 1},
+        }
+        tags = ["--literal", "", "two words", "x=y"]
+        result = await session.call_tool(tool.name, {"tags": tags, "level": 2})
+        assert not result.is_error
+        assert json.loads(result.content[0].text) == [tags, 2]

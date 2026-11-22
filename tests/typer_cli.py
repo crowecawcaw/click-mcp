@@ -1,5 +1,6 @@
+import json
 from enum import Enum
-from typing import Annotated
+from typing import Annotated, Literal
 
 import typer
 from typer.main import get_command
@@ -32,6 +33,14 @@ def show(
 ):
     """Show a member's directory entry."""
     typer.echo(f"{member_id}:{limit}:{active}:{mode.value}")
+
+
+@members.command("collect")
+def collect(
+    tags: Annotated[list[str], typer.Option()],
+    level: Literal[1, 2] = 1,
+):
+    typer.echo(json.dumps([tags, level]))
 
 
 @members.command(hidden=True)

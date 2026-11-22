@@ -3,6 +3,7 @@ Scanner for Click commands to convert them to MCP tools.
 """
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -11,8 +12,13 @@ import click
 import mcp.types as types
 
 from .adapter import ToolAdapter
-from .compat import is_exposed_parameter, is_group, parameter_type
-from .decorator import get_mcp_metadata
+from .compat import (
+    is_exposed_parameter,
+    is_group,
+    parameter_arity,
+    parameter_value_schema,
+)
+from .decorator import CommandMetadata, get_mcp_metadata
 
 _original_paths: dict[str, str] = {}
 
@@ -60,9 +66,18 @@ def scan_tool_routes(
     include_all_commands: bool = True,
     *,
     include_hidden: bool = False,
+    command_metadata: CommandMetadata | None = None,
 ) -> dict[str, ToolRoute]:
     """Build a tool table with the Click path and parameters for each tool."""
     routes: dict[str, ToolRoute] = {}
+    scoped_metadata = (
+        {
+            tuple(key.split(".")) if isinstance(key, str) else key: value
+            for key, value in command_metadata.items()
+        }
+        if command_metadata is not None
+        else None
+    )
     root_has_params = any(
         param.name != "help" and is_exposed_parameter(param) for param in command.params
     )
@@ -85,9 +100,13 @@ def scan_tool_routes(
                     continue
 
                 command_path = (*path, name)
-                metadata = get_mcp_metadata(".".join(command_path))
-                if not metadata:
-                    metadata = get_mcp_metadata(name)
+                metadata: Mapping[str, Any]
+                if scoped_metadata is None:
+                    metadata = get_mcp_metadata(
+                        ".".join(command_path)
+                    ) or get_mcp_metadata(name)
+                else:
+                    metadata = scoped_metadata.get(command_path, {})
                 if metadata.get("include") is False:
                     continue
 
@@ -122,7 +141,7 @@ def _create_tool(
     tool_name: str,
     cmd: click.Command,
     commands: tuple[click.Command, ...],
-    metadata: dict[str, Any],
+    metadata: Mapping[str, Any],
     adapter: ToolAdapter | None,
 ) -> types.Tool:
     properties: dict[str, dict[str, Any]] = {}
@@ -130,6 +149,10 @@ def _create_tool(
     for command in commands:
         for param in command.params:
             if param.name and (schema := _get_parameter_info(param)) is not None:
+                if param.name in properties:
+                    raise ValueError(
+                        f"Tool {tool_name!r} binds parameter {param.name!r} more than once"
+                    )
                 properties[param.name] = schema
                 if param.required:
                     required.add(param.name)
@@ -155,21 +178,21 @@ def _get_parameter_info(param: click.Parameter) -> dict[str, Any] | None:
     if not is_exposed_parameter(param) or not param.name:
         return None
 
-    schema_type, choices = parameter_type(param)
-    param_data: dict[str, Any] = {"type": schema_type}
+    nargs, multiple = parameter_arity(param)
+    param_data = parameter_value_schema(param)
+    if multiple:
+        param_data = {"type": "array", "items": param_data}
+    if param.required and (multiple or nargs == -1):
+        param_data["minItems"] = 1
     if help_text := getattr(param, "help", None):
         param_data["description"] = help_text
-    if choices is not None:
-        param_data["enum"] = choices
 
-    # Add default if available and not callable
-    # Filter out Click's Sentinel.UNSET and other non-JSON-serializable defaults
     default = getattr(param, "default", None)
     if isinstance(default, Enum) and getattr(param, "type_descriptor", None):
         default = str(default.value)
-    if default is not None and not callable(default):
-        # Only include JSON-serializable defaults (str, int, float, bool, list, dict, None)
-        if isinstance(default, (str, int, float, bool, list, dict, type(None))):
-            param_data["default"] = default
+    if isinstance(default, tuple) and (multiple or nargs != 1):
+        default = list(default)
+    if isinstance(default, (str, int, float, bool, list, dict)):
+        param_data["default"] = default
 
     return param_data

@@ -18,7 +18,8 @@ from mcp.server.context import ServerRequestContext
 from mcp.server.lowlevel import Server
 
 from . import __version__
-from .compat import invoke_command, is_exposed_parameter
+from .compat import invoke_command, is_exposed_parameter, parameter_arity
+from .decorator import CommandMetadata
 from .hooks import ConfigureServer, ToolCompletion, ToolCompletionHook
 from .scanner import ToolRoute, scan_tool_routes
 
@@ -39,6 +40,7 @@ class MCPServer:
         include_all_commands: bool = True,
         *,
         include_hidden: bool = False,
+        command_metadata: CommandMetadata | None = None,
         configure_server: ConfigureServer | None = None,
         on_tool_complete: ToolCompletionHook | None = None,
     ):
@@ -50,6 +52,7 @@ class MCPServer:
             server_name: The name of the MCP server.
             include_all_commands: Expose commands by default.
             include_hidden: Whether hidden commands and groups can be exposed.
+            command_metadata: Server-local metadata keyed by exact command path.
             configure_server: Optional callback to register SDK handlers at startup.
             on_tool_complete: Optional async callback after tool invocation.
         """
@@ -57,7 +60,10 @@ class MCPServer:
         self.server_name = server_name
         self.on_tool_complete = on_tool_complete
         self.routes = scan_tool_routes(
-            cli_group, include_all_commands, include_hidden=include_hidden
+            cli_group,
+            include_all_commands,
+            include_hidden=include_hidden,
+            command_metadata=command_metadata,
         )
         self.click_tools = [route.tool for route in self.routes.values()]
         self.tool_map = {tool.name: tool for tool in self.click_tools}
@@ -243,20 +249,27 @@ class MCPServer:
         param_definitions: Optional[List[click.Parameter]] = None,
     ) -> List[str]:
         """Convert parameters to CLI arguments."""
-        args = []
-
-        # Add positional arguments in order
-        for param_name in positional_order:
-            if param_name in parameters:
-                args.append(str(parameters[param_name]))
+        args: list[str] = []
 
         if param_definitions is None:
+            args.extend(
+                str(parameters[name]) for name in positional_order if name in parameters
+            )
             for name, value in parameters.items():
                 if name not in positional_order:
                     self._add_option_arg(
                         args, name, value, is_bool=isinstance(value, bool)
                     )
             return args
+
+        positionals = {
+            param.name: param
+            for param in param_definitions
+            if param.name in positional_order
+        }
+        for name in positional_order:
+            if name in parameters:
+                args.extend(self._parameter_values(positionals[name], parameters[name]))
 
         options: list[str] = []
         for param in param_definitions:
@@ -279,14 +292,35 @@ class MCPServer:
             elif option_param.is_flag:
                 if value == option_param.flag_value:
                     options.append(option)
-            elif option.startswith("--"):
-                options.append(f"{option}={value}")
             else:
-                options.extend([option, str(value)])
+                _, multiple = parameter_arity(param)
+                occurrences = value if multiple else [value]
+                if not isinstance(occurrences, (list, tuple)):
+                    raise _ToolExecutionError(
+                        f"Parameter {param.name!r} requires an array"
+                    )
+                for occurrence in occurrences:
+                    values = self._parameter_values(param, occurrence)
+                    if option.startswith("--"):
+                        options.extend([f"{option}={values[0]}", *values[1:]])
+                    else:
+                        options.extend([option, *values])
 
         if any(arg.startswith("-") for arg in args):
             return [*options, "--", *args]
         return [*args, *options]
+
+    @staticmethod
+    def _parameter_values(param: click.Parameter, value: Any) -> list[str]:
+        nargs, _ = parameter_arity(param)
+        if nargs == 1:
+            return [str(value)]
+        if not isinstance(value, (list, tuple)) or (nargs > 1 and len(value) != nargs):
+            size = f" of length {nargs}" if nargs > 1 else ""
+            raise _ToolExecutionError(
+                f"Parameter {param.name!r} requires an array{size}"
+            )
+        return [str(item) for item in value]
 
     def _add_option_arg(
         self, args: List[str], param_name: str, value: Any, is_bool: bool
