@@ -68,11 +68,11 @@ async def test_basic_server_tools(basic_mcp_session):
 
     assert greet_tool is not None
     # Verify inputSchema structure
-    assert greet_tool.inputSchema["type"] == "object"
-    assert "properties" in greet_tool.inputSchema
-    assert "name" in greet_tool.inputSchema["properties"]
-    assert "required" in greet_tool.inputSchema
-    assert "name" in greet_tool.inputSchema["required"]
+    assert greet_tool.input_schema["type"] == "object"
+    assert "properties" in greet_tool.input_schema
+    assert "name" in greet_tool.input_schema["properties"]
+    assert "required" in greet_tool.input_schema
+    assert "name" in greet_tool.input_schema["required"]
 
     # Find the users_list command
     users_list_tool = None
@@ -83,13 +83,13 @@ async def test_basic_server_tools(basic_mcp_session):
 
     assert users_list_tool is not None
     # Verify inputSchema structure (should only have help param)
-    assert users_list_tool.inputSchema["type"] == "object"
-    assert "properties" in users_list_tool.inputSchema
+    assert users_list_tool.input_schema["type"] == "object"
+    assert "properties" in users_list_tool.input_schema
     # Click automatically adds --help, so we expect only that property
-    assert len(users_list_tool.inputSchema["properties"]) <= 1
-    if len(users_list_tool.inputSchema["properties"]) == 1:
-        assert "help" in users_list_tool.inputSchema["properties"]
-    assert "required" not in users_list_tool.inputSchema  # No required params
+    assert len(users_list_tool.input_schema["properties"]) <= 1
+    if len(users_list_tool.input_schema["properties"]) == 1:
+        assert "help" in users_list_tool.input_schema["properties"]
+    assert "required" not in users_list_tool.input_schema  # No required params
 
     # Find the echo command
     echo_tool = None
@@ -100,13 +100,13 @@ async def test_basic_server_tools(basic_mcp_session):
 
     assert echo_tool is not None
     # Verify inputSchema structure
-    assert echo_tool.inputSchema["type"] == "object"
-    assert "properties" in echo_tool.inputSchema
-    assert "count" in echo_tool.inputSchema["properties"]
-    assert echo_tool.inputSchema["properties"]["count"]["type"] == "integer"
-    assert "message" in echo_tool.inputSchema["properties"]
-    assert "required" in echo_tool.inputSchema
-    assert "message" in echo_tool.inputSchema["required"]  # Only message is required
+    assert echo_tool.input_schema["type"] == "object"
+    assert "properties" in echo_tool.input_schema
+    assert "count" in echo_tool.input_schema["properties"]
+    assert echo_tool.input_schema["properties"]["count"]["type"] == "integer"
+    assert "message" in echo_tool.input_schema["properties"]
+    assert "required" in echo_tool.input_schema
+    assert "message" in echo_tool.input_schema["required"]  # Only message is required
 
 
 @pytest.mark.anyio
@@ -208,8 +208,7 @@ async def test_error_handling(basic_mcp_session):
     # instead of raising an exception
     result = await basic_mcp_session.call_tool("non_existent_tool", {})
     assert result is not None
-    assert hasattr(result, "isError")
-    assert result.isError is True
+    assert result.is_error is True
     assert len(result.content) > 0
     error_message = result.content[0].text.lower()
     assert (
@@ -221,8 +220,7 @@ async def test_error_handling(basic_mcp_session):
     # Test with missing required parameter
     result = await basic_mcp_session.call_tool(greet_tool.name, {})
     assert result is not None
-    assert hasattr(result, "isError")
-    assert result.isError is True
+    assert result.is_error is True
     assert len(result.content) > 0
     error_message = result.content[0].text.lower()
     assert (
@@ -252,13 +250,13 @@ async def test_advanced_server_tools(advanced_mcp_session):
 
     assert config_set_tool is not None
     # Verify inputSchema structure
-    assert config_set_tool.inputSchema["type"] == "object"
-    assert "properties" in config_set_tool.inputSchema
-    assert "key" in config_set_tool.inputSchema["properties"]
-    assert "value" in config_set_tool.inputSchema["properties"]
-    assert "required" in config_set_tool.inputSchema
-    assert "key" in config_set_tool.inputSchema["required"]
-    assert "value" in config_set_tool.inputSchema["required"]
+    assert config_set_tool.input_schema["type"] == "object"
+    assert "properties" in config_set_tool.input_schema
+    assert "key" in config_set_tool.input_schema["properties"]
+    assert "value" in config_set_tool.input_schema["properties"]
+    assert "required" in config_set_tool.input_schema
+    assert "key" in config_set_tool.input_schema["required"]
+    assert "value" in config_set_tool.input_schema["required"]
 
     # Find the greet command with formal option
     greet_tool = None
@@ -269,13 +267,13 @@ async def test_advanced_server_tools(advanced_mcp_session):
 
     assert greet_tool is not None
     # Verify inputSchema structure
-    assert greet_tool.inputSchema["type"] == "object"
-    assert "properties" in greet_tool.inputSchema
-    assert "name" in greet_tool.inputSchema["properties"]
-    assert "formal" in greet_tool.inputSchema["properties"]
-    assert greet_tool.inputSchema["properties"]["formal"]["type"] == "boolean"
-    assert "required" in greet_tool.inputSchema
-    assert "name" in greet_tool.inputSchema["required"]  # Only name is required
+    assert greet_tool.input_schema["type"] == "object"
+    assert "properties" in greet_tool.input_schema
+    assert "name" in greet_tool.input_schema["properties"]
+    assert "formal" in greet_tool.input_schema["properties"]
+    assert greet_tool.input_schema["properties"]["formal"]["type"] == "boolean"
+    assert "required" in greet_tool.input_schema
+    assert "name" in greet_tool.input_schema["required"]  # Only name is required
 
 
 @pytest.fixture
@@ -350,11 +348,11 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
 
     assert config_get_tool is not None
     # Verify inputSchema structure for positional arguments
-    assert config_get_tool.inputSchema["type"] == "object"
-    assert "properties" in config_get_tool.inputSchema
-    assert "key" in config_get_tool.inputSchema["properties"]
-    assert "required" in config_get_tool.inputSchema
-    assert "key" in config_get_tool.inputSchema["required"]
+    assert config_get_tool.input_schema["type"] == "object"
+    assert "properties" in config_get_tool.input_schema
+    assert "key" in config_get_tool.input_schema["properties"]
+    assert "required" in config_get_tool.input_schema
+    assert "key" in config_get_tool.input_schema["required"]
 
     # Invoke the command with positional argument
     result = await advanced_mcp_session.call_tool(
@@ -373,11 +371,11 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
 
     assert config_get_value_tool is not None
     # Verify inputSchema structure for positional arguments
-    assert config_get_value_tool.inputSchema["type"] == "object"
-    assert "properties" in config_get_value_tool.inputSchema
-    assert "key" in config_get_value_tool.inputSchema["properties"]
-    assert "required" in config_get_value_tool.inputSchema
-    assert "key" in config_get_value_tool.inputSchema["required"]
+    assert config_get_value_tool.input_schema["type"] == "object"
+    assert "properties" in config_get_value_tool.input_schema
+    assert "key" in config_get_value_tool.input_schema["properties"]
+    assert "required" in config_get_value_tool.input_schema
+    assert "key" in config_get_value_tool.input_schema["required"]
 
     # Invoke the command with positional argument
     result = await advanced_mcp_session.call_tool(
@@ -396,14 +394,14 @@ async def test_invoke_advanced_commands(advanced_mcp_session):
 
     assert copy_tool is not None
     # Verify inputSchema structure for multiple positional arguments
-    assert copy_tool.inputSchema["type"] == "object"
-    assert "properties" in copy_tool.inputSchema
-    assert "source" in copy_tool.inputSchema["properties"]
-    assert "destination" in copy_tool.inputSchema["properties"]
-    assert "overwrite" in copy_tool.inputSchema["properties"]
-    assert "required" in copy_tool.inputSchema
-    assert "source" in copy_tool.inputSchema["required"]
-    assert "destination" in copy_tool.inputSchema["required"]
+    assert copy_tool.input_schema["type"] == "object"
+    assert "properties" in copy_tool.input_schema
+    assert "source" in copy_tool.input_schema["properties"]
+    assert "destination" in copy_tool.input_schema["properties"]
+    assert "overwrite" in copy_tool.input_schema["properties"]
+    assert "required" in copy_tool.input_schema
+    assert "source" in copy_tool.input_schema["required"]
+    assert "destination" in copy_tool.input_schema["required"]
 
     # Invoke the command with positional arguments
     result = await advanced_mcp_session.call_tool(
@@ -455,34 +453,53 @@ async def test_mcp_command_excluded_from_tools(basic_mcp_session):
     result = await basic_mcp_session.list_tools()
     tools = result.tools
     tool_names = [tool.name for tool in tools]
-    
+
     # Verify that the default 'mcp' command is NOT exposed as a tool
-    assert "mcp" not in tool_names, f"Default MCP command 'mcp' should not be exposed as a tool, but found in {tool_names}"
-    
+    assert (
+        "mcp" not in tool_names
+    ), f"Default MCP command 'mcp' should not be exposed as a tool, but found in {tool_names}"
+
     # Verify that expected tools are present (sanity check)
     expected_tools = ["echo", "greet", "users_list"]
     for expected_tool in expected_tools:
-        assert expected_tool in tool_names, f"Expected tool '{expected_tool}' not found in {tool_names}"
-    
+        assert (
+            expected_tool in tool_names
+        ), f"Expected tool '{expected_tool}' not found in {tool_names}"
+
     # Verify we have the expected number of tools (no extra MCP command)
-    assert len(tool_names) == len(expected_tools), f"Expected {len(expected_tools)} tools, but got {len(tool_names)}: {tool_names}"
+    assert len(tool_names) == len(
+        expected_tools
+    ), f"Expected {len(expected_tools)} tools, but got {len(tool_names)}: {tool_names}"
 
 
-@pytest.mark.anyio 
+@pytest.mark.anyio
 async def test_custom_mcp_command_excluded_from_tools(advanced_mcp_session):
     """Test that custom MCP command names are also excluded from tool discovery."""
     # Get all available tools from advanced CLI (which uses 'start-mcp' as MCP command)
     result = await advanced_mcp_session.list_tools()
     tools = result.tools
     tool_names = [tool.name for tool in tools]
-    
+
     # Verify that the custom 'start-mcp' command is NOT exposed as a tool
-    assert "start-mcp" not in tool_names, f"Custom MCP command 'start-mcp' should not be exposed as a tool, but found in {tool_names}"
-    
+    assert (
+        "start-mcp" not in tool_names
+    ), f"Custom MCP command 'start-mcp' should not be exposed as a tool, but found in {tool_names}"
+
     # Verify that the default 'mcp' command is also not there
-    assert "mcp" not in tool_names, f"Default MCP command 'mcp' should not be exposed as a tool, but found in {tool_names}"
-    
+    assert (
+        "mcp" not in tool_names
+    ), f"Default MCP command 'mcp' should not be exposed as a tool, but found in {tool_names}"
+
     # Verify that expected tools are present (sanity check)
-    expected_tools = ["config_get", "config_get_value", "config_set", "copy", "greet", "process"]
+    expected_tools = [
+        "config_get",
+        "config_get_value",
+        "config_set",
+        "copy",
+        "greet",
+        "process",
+    ]
     for expected_tool in expected_tools:
-        assert expected_tool in tool_names, f"Expected tool '{expected_tool}' not found in {tool_names}"
+        assert (
+            expected_tool in tool_names
+        ), f"Expected tool '{expected_tool}' not found in {tool_names}"

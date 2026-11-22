@@ -1,17 +1,10 @@
-[env]
-requires = ["hatch-vcs"]
-
 [envs.default]
+features = ["test"]
 dependencies = [
-  "pytest>=7.0.0",
-  "pytest-cov>=4.0.0",
-  "pytest-anyio>=0.7.0",
-  "trio>=0.22.0",
-  "black>=23.0.0",
+  "black>=26.0",
   "ruff>=0.1.0",
   "mypy>=1.5.0",
   "build>=1.0.0",
-  "mcp>=0.1.0",
 ]
 
 [envs.default.scripts]
@@ -21,7 +14,6 @@ lint = "ruff check click_mcp tests"
 lint-fix = "ruff check --fix click_mcp tests"
 format = "black click_mcp tests"
 check-format = "black --check click_mcp tests"
-typecheck = "python -m mypy click_mcp --ignore-missing-imports"
+typecheck = "python -m mypy click_mcp"
 check-all = ["check-format", "lint", "test", "typecheck"]
 build = "python -m build"
-docs = "cd docs && make html"

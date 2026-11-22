@@ -9,7 +9,7 @@ A Python library that extends Click applications with Model Context Protocol (MC
 
 `click-mcp` provides a simple decorator that converts Click commands into MCP tools. This enables AI agents to discover and interact with your CLI applications programmatically.
 
-The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol/servers) is an open standard for AI agents to interact with tools and applications in a structured way.
+The [Model Context Protocol (MCP)](https://modelcontextprotocol.io/specification) is an open standard for AI agents to interact with tools and applications in a structured way.
 
 ## Key Features
 
@@ -20,6 +20,8 @@ The [Model Context Protocol (MCP)](https://github.com/modelcontextprotocol/serve
 - Stdio-based MCP server for easy integration
 
 ## Installation
+
+Requires Python 3.10 or later and the MCP Python SDK 2.3 or later in the 2.x series. CI tests Python 3.10 through 3.15.
 
 ```bash
 pip install click-mcp
@@ -49,16 +51,18 @@ if __name__ == '__main__':
 
 When you run the MCP server, Click commands are converted into MCP tools:
 - Command `greet` becomes MCP tool `greet`
-- Nested commands use dot notation (e.g., `users.create`)
+- Nested commands use underscores (e.g., `users_create`)
 
-To invoke a command via MCP, send a request like:
+After initializing an MCP session, call the tool with `tools/call`:
 
 ```json
 {
-  "type": "invoke",
-  "tool": "greet",
-  "parameters": {
-    "name": "World"
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "tools/call",
+  "params": {
+    "name": "greet",
+    "arguments": {"name": "World"}
   }
 }
 ```
@@ -76,7 +80,7 @@ $ python my_app.py mcp
 By default, `click-mcp` adds an `mcp` command to your CLI application. You can customize this name using the `command_name` parameter:
 
 ```python
-@click_mcp(command_name="start-mcp")
+@click_mcp(server_name="my-cli-app", command_name="start-mcp")
 @click.group()
 def cli():
     """Sample CLI application with custom MCP command name."""
@@ -116,7 +120,7 @@ This can be useful when:
 `click-mcp` supports nested command groups. When you have a complex CLI structure with subcommands, all commands are exposed as MCP tools:
 
 ```python
-@click_mcp
+@click_mcp(server_name="my-cli-app")
 @click.group()
 def cli():
     """Main CLI application."""
@@ -140,7 +144,7 @@ def delete(username):
     click.echo(f"Deleting user: {username}")
 ```
 
-When exposed as MCP tools, the nested commands will be available with their full path using dot notation (e.g., "users.create" and "users.delete").
+When exposed as MCP tools, the nested commands will be available with their full path using underscores (e.g., `users_create` and `users_delete`).
 
 ### Working with Positional Arguments
 
@@ -187,10 +191,17 @@ The positional nature of arguments is handled internally by `click-mcp`. When in
 {
   "type": "invoke",
   "tool": "copy",
-  "parameters": {
-    "source": "file.txt",
-    "destination": "/tmp/file.txt",
-    "overwrite": true
+  "inputSchema": {
+    "type": "object",
+    "properties": {
+      "source": {"type": "string"},
+      "destination": {"type": "string"},
+      "overwrite": {
+        "type": "boolean",
+        "description": "Overwrite destination if it exists"
+      }
+    },
+    "required": ["destination", "source"]
   }
 }
 ```
@@ -227,7 +238,7 @@ If the file doesn't exist, the AI agent will receive an error message that it ca
 Clone the repository and install Hatch:
 
 ```bash
-git clone https://github.com/aws/click-mcp.git
+git clone https://github.com/crowecawcaw/click-mcp.git
 cd click-mcp
 pip install hatch
 ```
@@ -286,14 +297,6 @@ Build the package:
 
 ```bash
 hatch run build
-```
-
-### Documentation
-
-Generate documentation:
-
-```bash
-hatch run docs
 ```
 
 ## Related Resources

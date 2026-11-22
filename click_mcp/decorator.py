@@ -82,10 +82,10 @@ def _add_mcp_command(
     @cli_group.command(name=command_name)
     def mcp_command() -> None:
         """Start the MCP server for this CLI application."""
-        server = MCPServer(cli_group, server_name)
+        server = MCPServer(cli_group, server_name, include_all_commands)
         server.run()
 
     # Mark this command as an MCP command for robust detection
-    mcp_command._is_mcp_command = True
+    mcp_command._is_mcp_command = True  # type: ignore[attr-defined]
 
     return cli_group
