@@ -24,8 +24,8 @@ git commit -m "Bump version to X.Y.Z"
 1. Ensure all tests pass and code quality checks succeed:
 
 ```bash
-hatch run lint:all
-hatch run test:cov
+hatch run check-all
+hatch run cov
 ```
 
 2. Fix any issues that arise from these checks.

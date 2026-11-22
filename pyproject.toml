@@ -25,14 +25,13 @@ classifiers = [
 ]
 dependencies = [
     "click>=7.0",
-    "mcp>=0.1.0",
+    "mcp>=2.3,<3",
 ]
 
 [project.optional-dependencies]
 test = [
     "pytest>=6.0",
     "pytest-cov",
-    "pytest-anyio",
     "pytest-timeout",
     "trio",
     "jsonschema>=4.0",
@@ -55,7 +54,7 @@ line-length = 88
 
 [tool.ruff.lint]
 select = ["E", "F", "B", "I"]
-ignore = []
+ignore = ["E501"]
 
 [tool.mypy]
 python_version = "3.10"
@@ -69,4 +68,5 @@ ignore_missing_imports = true
 testpaths = ["tests"]
 python_files = "test_*.py"
 python_functions = "test_*"
-addopts = "--cov=click_mcp --cov-report=term-missing"
+timeout = 10
+timeout_method = "thread"

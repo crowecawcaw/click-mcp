@@ -4,17 +4,18 @@ Test CLI with custom MCP command name to verify it's properly excluded.
 """
 
 import click
+
 from click_mcp import click_mcp
 
 
 @click_mcp(server_name="custom-mcp-cli", command_name="start-server")
 @click.group()
-@click.option('--env', default='DEFAULT', help='Environment to use')
+@click.option("--env", default="DEFAULT", help="Environment to use")
 @click.pass_context
 def parent(ctx, env):
     """Parent command with custom MCP command name."""
     ctx.ensure_object(dict)
-    ctx.obj['env'] = env
+    ctx.obj["env"] = env
     click.echo(f"Parent: Setting env to {env}")
 
 
@@ -25,8 +26,8 @@ def child_a(ctx):
     if ctx.obj is None:
         click.echo("Child A: ERROR - ctx.obj is None!")
         return
-    
-    env = ctx.obj.get('env', 'UNKNOWN')
+
+    env = ctx.obj.get("env", "UNKNOWN")
     click.echo(f"Child A: Using env {env}")
 
 
@@ -36,5 +37,5 @@ def regular_command():
     click.echo("Regular command executed")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parent()
