@@ -24,6 +24,7 @@ async def test_typer_nested_tool_schema_and_invocation():
                 "limit": {
                     "type": "integer",
                     "description": "Maximum rows",
+                    "minimum": 1,
                     "default": 3,
                 },
                 "active": {"type": "boolean", "default": True},
