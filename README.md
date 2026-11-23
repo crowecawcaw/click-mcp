@@ -308,6 +308,10 @@ names. Known arguments must match the advertised schema, including types and
 required fields. The default is `False`, which preserves Click's usual input
 coercion and ignores unknown MCP arguments.
 
+Generated schemas advertise numeric minimum and maximum bounds for non-clamping
+Click/Typer ranges, including exclusive bounds when supported by Click. Clamped
+ranges omit these bounds so out-of-range inputs can still be normalized by the CLI.
+
 A custom `ToolAdapter.input_schema` still controls validation for that tool.
 This setting affects only MCP calls, not normal CLI usage.
 

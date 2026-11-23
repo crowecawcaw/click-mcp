@@ -26,7 +26,9 @@ def parameter_arity(param: click.Parameter) -> tuple[int, bool]:
 def parameter_value_schema(param: click.Parameter) -> dict[str, Any]:
     """Describe one occurrence of a parameter, before wrapping repeatable options."""
     click_type = getattr(param, "type", None)
-    annotation = getattr(getattr(param, "type_descriptor", None), "annotation", None)
+    descriptor = getattr(param, "type_descriptor", None)
+    annotation = getattr(descriptor, "annotation", None)
+    constraints = getattr(descriptor, "parameter_info", None)
     if get_origin(annotation) is list:
         (annotation,) = get_args(annotation)
 
@@ -35,7 +37,7 @@ def parameter_value_schema(param: click.Parameter) -> dict[str, Any]:
         return (
             _click_type_schema(click_type)
             if click_type is not None
-            else _annotation_schema(annotation)
+            else _annotation_schema(annotation, constraints)
         )
 
     if click_type is not None and hasattr(click_type, "types"):
@@ -47,7 +49,7 @@ def parameter_value_schema(param: click.Parameter) -> dict[str, Any]:
             "maxItems": nargs,
         }
     if get_origin(annotation) is tuple and nargs > 1:
-        items = [_annotation_schema(item) for item in get_args(annotation)]
+        items = [_annotation_schema(item, constraints) for item in get_args(annotation)]
         return {
             "type": "array",
             "prefixItems": items,
@@ -58,7 +60,7 @@ def parameter_value_schema(param: click.Parameter) -> dict[str, Any]:
     items_schema = (
         _click_type_schema(click_type)
         if click_type is not None
-        else _annotation_schema(annotation)
+        else _annotation_schema(annotation, constraints)
     )
     schema: dict[str, Any] = {"type": "array", "items": items_schema}
     if nargs > 1:
@@ -75,14 +77,36 @@ def _click_type_schema(click_type: Any) -> dict[str, Any]:
         ("BoolParamType", "boolean"),
     ):
         if cls in names:
-            return {"type": schema}
+            result = {"type": schema}
+            if names & {"IntRange", "FloatRange"}:
+                result.update(_numeric_bounds(click_type))
+            return result
     choices = getattr(click_type, "choices", None)
     if isinstance(choices, (list, tuple)):
         return {"type": "string", "enum": list(choices)}
     return {"type": "string"}
 
 
-def _annotation_schema(annotation: Any) -> dict[str, Any]:
+def _numeric_bounds(constraints: Any) -> dict[str, Any]:
+    # Clamping accepts values outside the range and normalizes them at invocation.
+    if getattr(constraints, "clamp", False):
+        return {}
+    bounds = {}
+    for attr, inclusive, exclusive in (
+        ("min", "minimum", "exclusiveMinimum"),
+        ("max", "maximum", "exclusiveMaximum"),
+    ):
+        value = getattr(constraints, attr, None)
+        if value is not None:
+            # Click 7.0 has only inclusive bounds and no *_open attributes.
+            key = (
+                exclusive if getattr(constraints, f"{attr}_open", False) else inclusive
+            )
+            bounds[key] = value
+    return bounds
+
+
+def _annotation_schema(annotation: Any, constraints: Any = None) -> dict[str, Any]:
     json_types = {int: "integer", float: "number", bool: "boolean", str: "string"}
     if isinstance(annotation, type) and issubclass(annotation, Enum):
         return {"type": "string", "enum": [str(choice.value) for choice in annotation]}
@@ -98,10 +122,16 @@ def _annotation_schema(annotation: Any) -> dict[str, Any]:
                 "enum": choices,
             }
         return {"type": "string", "enum": [str(choice) for choice in choices]}
+    bounds = (
+        _numeric_bounds(constraints)
+        if annotation in (int, float) and getattr(constraints, "parser", None) is None
+        else {}
+    )
     return {
+        **bounds,
         "type": json_types.get(
             annotation if isinstance(annotation, type) else str, "string"
-        )
+        ),
     }
 
 
